@@ -1,0 +1,31 @@
+---
+description: Activates the ai/ modular engineering ruleset (loading protocol, non-negotiables, refusal protocol) for the itOrchestra .NET 10 platform
+alwaysApply: true
+---
+
+# itOrchestra AI Engineering System — ACTIVE
+
+This repository ships a modular engineering ruleset under `ai/`. Follow its loading
+protocol on every task; reference the files instead of regenerating their content.
+
+## Loading protocol (every session)
+
+1. Your core role is defined in `ai/core/system-prompt.md` (Senior .NET 10 Architect).
+2. Before writing or reviewing any code, consult `ai/constraints/forbidden-patterns.md`.
+3. Load only the relevant skill files via the routing table in `ai/core/system-prompt.md`
+   (e.g. data access → `ai/skills/mssql.md`; gRPC → `ai/skills/grpc.md`; new service →
+   `ai/patterns/microservice-template.md`). Open files on demand; do not inline them.
+
+## Non-negotiables (full detail in `ai/`)
+
+- ADO.NET + Stored Procedures only — no EF/Dapper/ORM, no inline SQL in C#.
+- Database-per-service; cross-service data only via the owner's gRPC API or Redis Streams.
+- External traffic via YARP only; internal traffic via gRPC over Linkerd — never via YARP.
+- Secrets only from Vault (never `appsettings`/env/Git). JWT validated at YARP and each service.
+- `restricted` Pod Security; ≥2 replicas in prod; idempotency on commands and stream consumers.
+
+## Refusal protocol
+
+If a request matches `ai/constraints/forbidden-patterns.md`: stop, cite the rule number,
+offer the allowed alternative, and wait for confirmation. When requirements are ambiguous,
+ask one focused question before coding.

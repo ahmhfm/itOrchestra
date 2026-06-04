@@ -16,6 +16,17 @@ Persistent project context for AI agents. Keep this file accurate and up to date
 - `platform/` is a **normal tracked folder** — NOT a Git submodule and NOT a separate repository.
 - The planning docs in `itOrchestra plan/` live **outside** this repository (separate docs location).
 
+## AI engineering ruleset (`ai/`)
+
+This repo ships a modular engineering ruleset under `ai/`, activated for every session via
+the always-on Cursor rule `.cursor/rules/ai-engineering-system.mdc`.
+
+**Loading protocol (every task):**
+1. Core role: `ai/core/system-prompt.md` (Senior .NET 10 Architect).
+2. Always consult `ai/constraints/forbidden-patterns.md` before writing/reviewing code.
+3. Load only the relevant skill files via the routing table in `ai/core/system-prompt.md`
+   (open on demand; do not inline). See `ai/README.md` for the full index.
+
 ## Git conventions
 
 - Atomic commits may span both application code and `platform/` infrastructure changes.
