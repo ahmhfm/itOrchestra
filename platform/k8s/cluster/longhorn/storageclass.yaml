@@ -1,0 +1,17 @@
+# Custom Longhorn StorageClass for itOrchestra stateful workloads.
+# The Helm install also creates the built-in "longhorn" class; this one makes
+# replica count / reclaim policy explicit and is what services should reference.
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: itorchestra-longhorn
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "true"
+provisioner: driver.longhorn.io
+allowVolumeExpansion: true
+reclaimPolicy: Delete
+volumeBindingMode: Immediate
+parameters:
+  numberOfReplicas: "1"        # dev = 1; set to 3 in prod
+  staleReplicaTimeout: "30"
+  fsType: "ext4"

@@ -1,0 +1,22 @@
+# MetalLB L2 pool - PROD EXAMPLE.
+# Set a reserved, unused range on the cluster's LAN segment (outside DHCP scope).
+# This range is the set of "internal LoadBalancer" IPs the cluster hands out
+# (ingress-nginx, and any other LoadBalancer Service).
+apiVersion: metallb.io/v1beta1
+kind: IPAddressPool
+metadata:
+  name: prod-pool
+  namespace: metallb-system
+spec:
+  addresses:
+    - "10.0.10.200-10.0.10.220"
+  autoAssign: true
+---
+apiVersion: metallb.io/v1beta1
+kind: L2Advertisement
+metadata:
+  name: prod-l2
+  namespace: metallb-system
+spec:
+  ipAddressPools:
+    - prod-pool

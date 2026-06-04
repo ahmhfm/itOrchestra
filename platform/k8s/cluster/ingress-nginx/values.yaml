@@ -1,0 +1,28 @@
+# ingress-nginx Helm values - itOrchestra.
+# Exposed as a LoadBalancer Service so MetalLB assigns it an internal LB IP.
+controller:
+  ingressClassResource:
+    name: nginx
+    default: true
+  service:
+    type: LoadBalancer
+    externalTrafficPolicy: Local
+  replicaCount: 1            # dev; raise for prod HA
+  admissionWebhooks:
+    enabled: true
+  config:
+    # Surface real client IPs and enforce sane proxy defaults.
+    use-forwarded-headers: "true"
+    proxy-body-size: "50m"
+  metrics:
+    enabled: true
+  # restricted-friendly security context
+  podSecurityContext:
+    runAsNonRoot: true
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi

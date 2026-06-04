@@ -1,0 +1,34 @@
+# ---- .NET Build Outputs ----
+bin/
+obj/
+[Aa]rtifacts/
+[Pp]ublish/
+TestResults/
+*.user
+*.suo
+*.coverage
+*.trx
+
+# ---- IDE & Tools ----
+.vs/
+.idea/
+*.DotSettings.user
+
+# ---- Secrets & Local Configurations ----
+kubeconfig
+*.kubeconfig
+k3s.yaml
+*.pfx
+*.key
+*.crt
+*.env
+secrets.json
+
+# ---- Runtime & Generated Files ----
+*.log
+*.tmp
+**/*.rendered.yaml
+
+# ---- OS Files ----
+Thumbs.db
+.DS_Store

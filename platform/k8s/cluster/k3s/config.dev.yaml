@@ -1,0 +1,24 @@
+# K3s server config - DEV profile (single node, WSL2)
+# Installed to /etc/rancher/k3s/config.yaml before running the K3s installer.
+#
+# Bundled components are disabled so we own them explicitly:
+#   flannel-backend: none + disable-network-policy  -> Cilium provides CNI + NetworkPolicy
+#   disable: traefik                                 -> ingress-nginx provides Ingress
+#   disable: servicelb                               -> MetalLB provides LoadBalancer
+#
+# kube-proxy is intentionally LEFT ENABLED for WSL stability; Cilium runs in
+# the default mode (kubeProxyReplacement=false) alongside kube-proxy.
+
+write-kubeconfig-mode: "0644"
+node-name: "itorchestra-dev"
+
+flannel-backend: "none"
+disable-network-policy: true
+
+disable:
+  - traefik
+  - servicelb
+
+# Keep default cluster CIDRs (Cilium uses the cluster-pool IPAM by default).
+cluster-cidr: "10.42.0.0/16"
+service-cidr: "10.43.0.0/16"

@@ -1,0 +1,36 @@
+# K3s server config - PROD profile (HA control plane, embedded etcd)
+# Installed to /etc/rancher/k3s/config.yaml on the FIRST control-plane server.
+# Additional control-plane servers use install-server-prod.sh with --server pointing
+# at the first node; workers use install-agent-prod.sh.
+#
+# Bundled components disabled (same rationale as dev): Cilium + ingress-nginx + MetalLB.
+
+write-kubeconfig-mode: "0640"
+
+flannel-backend: "none"
+disable-network-policy: true
+
+disable:
+  - traefik
+  - servicelb
+
+# HA: initialize the embedded etcd datastore on the first server.
+cluster-init: true
+
+cluster-cidr: "10.42.0.0/16"
+service-cidr: "10.43.0.0/16"
+
+# Add every control-plane node IP/hostname and the API VIP/LB name here.
+tls-san:
+  - "k8s-api.itorchestra.internal"
+  # - "10.0.0.10"
+  # - "10.0.0.11"
+  # - "10.0.0.12"
+
+# Hardening recommended for production.
+kube-apiserver-arg:
+  - "audit-log-path=/var/lib/rancher/k3s/server/logs/audit.log"
+  - "audit-log-maxage=30"
+
+# NOTE: the cluster join token must be supplied out-of-band (Vault), never committed:
+#   token: "<from-vault>"

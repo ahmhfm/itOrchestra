@@ -1,0 +1,9 @@
+# Local kubeconfig and secrets must never be committed
+kubeconfig
+*.kubeconfig
+k3s.yaml
+*.tmp
+*.log
+
+# Rendered (environment-specific) manifests produced at runtime
+**/*.rendered.yaml

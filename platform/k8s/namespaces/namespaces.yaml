@@ -1,0 +1,100 @@
+# itOrchestra platform + per-service namespaces (step 0.1).
+#
+# Conventions:
+#   - label  name=<ns>                          -> used by NetworkPolicy namespaceSelectors
+#   - annot. linkerd.io/inject: enabled          -> mesh sidecar injection (Linkerd installed in 0.2)
+#   - label  pod-security.kubernetes.io/enforce  -> Pod Security Standard per namespace
+#
+# Per-service namespaces use the 'restricted' profile. Infra namespaces (vault, redis,
+# keycloak, observability) use 'baseline' initially and can be tightened later.
+
+# ---------- Edge / gateway ----------
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ns-gateway
+  labels:
+    name: ns-gateway
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+  annotations:
+    linkerd.io/inject: enabled
+---
+# ---------- Per-service namespaces (microservices) ----------
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ns-identity
+  labels:
+    name: ns-identity
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+  annotations:
+    linkerd.io/inject: enabled
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ns-assets
+  labels:
+    name: ns-assets
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+  annotations:
+    linkerd.io/inject: enabled
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ns-discovery
+  labels:
+    name: ns-discovery
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+  annotations:
+    linkerd.io/inject: enabled
+---
+# ---------- Shared infrastructure namespaces (filled in by later 0.x steps) ----------
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: vault
+  labels:
+    name: vault
+    pod-security.kubernetes.io/enforce: baseline
+  annotations:
+    linkerd.io/inject: enabled
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: redis
+  labels:
+    name: redis
+    pod-security.kubernetes.io/enforce: baseline
+  annotations:
+    linkerd.io/inject: enabled
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: keycloak
+  labels:
+    name: keycloak
+    pod-security.kubernetes.io/enforce: baseline
+  annotations:
+    linkerd.io/inject: enabled
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: observability
+  labels:
+    name: observability
+    pod-security.kubernetes.io/enforce: baseline
+  annotations:
+    linkerd.io/inject: enabled
