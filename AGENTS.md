@@ -8,9 +8,9 @@ Persistent project context for AI agents. Keep this file accurate and up to date
 |------|-------|
 | Topology | Single **monorepo** — application code and infrastructure (`platform/`) live together as normal folders |
 | Local path (dev machine) | `D:\itOrchestra\` (mounted at `/mnt/d/itOrchestra` inside WSL2) |
-| Remote (`origin`) | `https://github.com/ahmhfm/itOrchestra.git` |
+| Remote (`origin`) | `git@github.com:ahmhfm/itOrchestra.git` (SSH) |
 | Default branch | `main` (tracks `origin/main`) |
-| Commit identity | `ahmhfm` <`ahmfhm1@hotmail.com`> |
+| Commit identity | `ahmhfm` <`ahmhfm1@hotmail.com`> |
 | First commit | `Chore: Initialize monorepo with platform IaC and solution root` |
 
 - `platform/` is a **normal tracked folder** — NOT a Git submodule and NOT a separate repository.
