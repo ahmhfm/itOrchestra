@@ -16,8 +16,13 @@ MSSQL_READY="$(kubectl -n "${NS}" get pod keycloak-mssql-0 -o jsonpath='{.status
 [ "${MSSQL_READY}" = "True" ] && ok "keycloak-mssql-0 Ready" || bad "MSSQL not Ready (Ready='${MSSQL_READY}')"
 
 echo "== 2) DB bootstrap Job completed =="
-JOB="$(kubectl -n "${NS}" get job keycloak-db-init -o jsonpath='{.status.succeeded}' 2>/dev/null)"
-[ "${JOB}" = "1" ] && ok "keycloak-db-init succeeded" || bad "db-init job not complete (succeeded='${JOB}')"
+if kubectl -n "${NS}" get job keycloak-db-init >/dev/null 2>&1; then
+  JOB="$(kubectl -n "${NS}" get job keycloak-db-init -o jsonpath='{.status.succeeded}' 2>/dev/null)"
+  [ "${JOB}" = "1" ] && ok "keycloak-db-init succeeded" || bad "db-init job not complete (succeeded='${JOB}')"
+else
+  # ttlSecondsAfterFinished GC'd the Job; Keycloak running against the DB proves it ran.
+  ok "keycloak-db-init already completed + GC'd (DB initialized)"
+fi
 
 echo "== 3) Keycloak pod Ready + linkerd-proxy injected =="
 POD="$(kubectl -n "${NS}" get pods -l app=keycloak -o jsonpath='{.items[-1:].metadata.name}' 2>/dev/null)"

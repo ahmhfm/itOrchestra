@@ -1,9 +1,13 @@
-# ns-gateway is default-deny (egress). The gateway must reach Keycloak's HTTP port to
-# proxy /realms, /admin, /resources, ... so open egress from ns-gateway -> keycloak:8080.
+# ns-gateway is default-deny (egress). The gateway must reach Keycloak to proxy /realms,
+# /admin, /resources, ... so open egress from ns-gateway -> keycloak.
+#
+# IMPORTANT (Linkerd mesh): for meshed -> meshed traffic the source proxy dials the
+# DESTINATION proxy's inbound port 4143 (where mTLS terminates), NOT the app's original
+# port. So we must allow 4143; 8080 is kept for any non-meshed/direct fallback. Without
+# 4143 the SYN is dropped and the proxy reports "service in fail-fast".
 #
 # The 'keycloak' namespace itself is baseline (no default-deny), so ingress is already
-# open; we only need the gateway-side egress rule here. Per-service egress to Keycloak's
-# JWKS is opened in each microservice's own step.
+# open; we only need the gateway-side egress rule here.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -17,4 +21,5 @@ spec:
         - namespaceSelector:
             matchLabels: { kubernetes.io/metadata.name: keycloak }
       ports:
-        - { protocol: TCP, port: 8080 }
+        - { protocol: TCP, port: 4143 }   # Linkerd proxy inbound (meshed mTLS hop)
+        - { protocol: TCP, port: 8080 }   # direct/non-meshed fallback
