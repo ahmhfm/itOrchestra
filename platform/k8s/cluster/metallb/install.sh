@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Install MetalLB (L2 mode) via Helm and configure an IP pool.
-# DEV: auto-detects the WSL eth0 /24 and renders the pool.
+# DEV: auto-detects the VM's primary NIC /24 and renders the pool.
 # PROD: pass PROFILE=prod to apply k8s/cluster/metallb/ippool.prod.yaml (edit it first).
 set -euo pipefail
 
@@ -18,7 +18,6 @@ helm repo add metallb https://metallb.github.io/metallb >/dev/null 2>&1 || true
 helm repo update metallb >/dev/null
 
 kubectl get ns "${METALLB_NS}" >/dev/null 2>&1 || kubectl create ns "${METALLB_NS}"
-# MetalLB speaker needs elevated privileges; relax PSA on its namespace.
 kubectl label ns "${METALLB_NS}" \
   pod-security.kubernetes.io/enforce=privileged --overwrite >/dev/null
 
@@ -33,11 +32,16 @@ if [ "${PROFILE}" = "prod" ]; then
   echo "==> Applying PROD pool from ippool.prod.yaml (edit the range first!)"
   kubectl apply -f "${SCRIPT_DIR}/ippool.prod.yaml"
 else
-  echo "==> Detecting WSL eth0 subnet to render a dev L2 pool"
-  NODE_IP="$(ip -4 -o addr show eth0 2>/dev/null | awk '{print $4}' | cut -d/ -f1 | head -n1)"
+  echo "==> Detecting the VM's primary NIC subnet to render a dev L2 pool"
+  PRIMARY_IF="$(ip -4 route show default 2>/dev/null | awk '{print $5; exit}')"
+  NODE_IP="$(ip -4 -o addr show "${PRIMARY_IF}" scope global 2>/dev/null | awk '{print $4}' | cut -d/ -f1 | head -n1)"
+  if [ -z "${NODE_IP}" ]; then
+    NODE_IP="$(ip -4 -o addr show scope global 2>/dev/null | awk '{print $4}' | cut -d/ -f1 | head -n1)"
+  fi
   if [ -z "${NODE_IP}" ]; then
     NODE_IP="$(kubectl get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}')"
   fi
+  echo "    primary NIC=${PRIMARY_IF:-unknown}  node IP=${NODE_IP}"
   BASE="$(echo "${NODE_IP}" | cut -d. -f1-3)"
   POOL_START="${BASE}.240"
   POOL_END="${BASE}.250"
