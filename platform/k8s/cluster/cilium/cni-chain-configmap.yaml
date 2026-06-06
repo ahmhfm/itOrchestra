@@ -1,0 +1,50 @@
+# Custom CNI conflist for Cilium + Linkerd CNI chaining (dev + prod).
+#
+# Why: with cni.exclusive=false alone, the Cilium agent still reconciles its own
+# 05-cilium.conflist back to a Cilium-only plugin list, stripping the linkerd-cni
+# plugin that the linkerd-cni DaemonSet appends. That race leaves most newly created
+# pods without Linkerd's iptables redirection (the linkerd-network-validator init
+# container then fails with "Connection refused"). Providing Cilium an explicit custom
+# conf that ALREADY contains the full chain makes [cilium-cni, linkerd-cni] the agent's
+# desired state, so it stops stripping it.
+#
+# Cilium consumes this via Helm: cni.customConf=true + cni.configMap=cni-configuration.
+# The linkerd plugin block mirrors what `linkerd install-cni` renders (edge-26.x):
+# proxy ports 4143/4140, proxy-uid 2102, nft iptables mode.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cni-configuration
+  namespace: kube-system
+data:
+  cni-config: |-
+    {
+      "cniVersion": "0.3.1",
+      "name": "cilium",
+      "plugins": [
+        {
+          "type": "cilium-cni",
+          "enable-debug": false,
+          "log-file": "/var/run/cilium/cilium-cni.log"
+        },
+        {
+          "name": "linkerd-cni",
+          "type": "linkerd-cni",
+          "log_level": "info",
+          "kubernetes": {
+            "kubeconfig": "/etc/cni/net.d/ZZZ-linkerd-cni-kubeconfig"
+          },
+          "linkerd": {
+            "incoming-proxy-port": 4143,
+            "outgoing-proxy-port": 4140,
+            "proxy-uid": 2102,
+            "ports-to-redirect": [],
+            "inbound-ports-to-ignore": ["4191", "4190"],
+            "simulate": false,
+            "use-wait-flag": false,
+            "iptables-mode": "nft",
+            "ipv6": false
+          }
+        }
+      ]
+    }

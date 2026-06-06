@@ -1,0 +1,86 @@
+# itOrchestra API Gateway (YARP) - dev Deployment.
+# Lives in ns-gateway (restricted PodSecurity + linkerd.io/inject=enabled), so the pod
+# runs non-root with a dropped capability set and gets a Linkerd proxy via the CNI plugin.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gateway
+  namespace: ns-gateway
+  labels:
+    app: gateway
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gateway
+  template:
+    metadata:
+      labels:
+        app: gateway
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: gateway
+          image: itorchestra/gateway:dev
+          # Image is imported straight into containerd (no registry) for dev.
+          imagePullPolicy: Never
+          ports:
+            - name: http
+              containerPort: 8080
+            - name: https
+              containerPort: 8443
+          env:
+            - name: ASPNETCORE_ENVIRONMENT
+              value: "Production"
+            - name: Gateway__Tls__CertPath
+              value: "/tls/tls.pfx"
+            - name: Gateway__Tls__CertPassword
+              valueFrom:
+                secretKeyRef:
+                  name: gateway-tls
+                  key: password
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 8080
+            initialDelaySeconds: 3
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "96Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            runAsUser: 1654
+            runAsGroup: 1654
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: tls
+              mountPath: /tls
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tls
+          secret:
+            secretName: gateway-tls
+            items:
+              - key: tls.pfx
+                path: tls.pfx
+        - name: tmp
+          emptyDir: {}

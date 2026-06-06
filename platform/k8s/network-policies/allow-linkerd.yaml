@@ -1,0 +1,126 @@
+# Allow meshed pods in the default-deny application namespaces to talk to the Linkerd
+# control plane, and let linkerd-viz scrape their proxy metrics. Without this, a meshed
+# pod's proxy cannot reach linkerd-identity/destination/policy (egress is denied) and
+# never gets its mTLS identity, so the pod never becomes Ready.
+#
+# Pairs with default-deny.yaml (deny all) + allow-dns.yaml (DNS egress). Per-service
+# app<->app paths are opened explicitly in each service's own step.
+#
+# Dev keeps the linkerd-ns egress unrestricted by port for simplicity; prod can scope it
+# to identity(8080), destination(8086) and policy(8090).
+
+# ---------------- ns-gateway ----------------
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-linkerd-egress
+  namespace: ns-gateway
+spec:
+  podSelector: {}
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: linkerd }
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-linkerd-viz-scrape
+  namespace: ns-gateway
+spec:
+  podSelector: {}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: linkerd-viz }
+      ports:
+        - { protocol: TCP, port: 4191 }
+---
+# ---------------- ns-identity ----------------
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-linkerd-egress
+  namespace: ns-identity
+spec:
+  podSelector: {}
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: linkerd }
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-linkerd-viz-scrape
+  namespace: ns-identity
+spec:
+  podSelector: {}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: linkerd-viz }
+      ports:
+        - { protocol: TCP, port: 4191 }
+---
+# ---------------- ns-assets ----------------
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-linkerd-egress
+  namespace: ns-assets
+spec:
+  podSelector: {}
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: linkerd }
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-linkerd-viz-scrape
+  namespace: ns-assets
+spec:
+  podSelector: {}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: linkerd-viz }
+      ports:
+        - { protocol: TCP, port: 4191 }
+---
+# ---------------- ns-discovery ----------------
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-linkerd-egress
+  namespace: ns-discovery
+spec:
+  podSelector: {}
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: linkerd }
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-linkerd-viz-scrape
+  namespace: ns-discovery
+spec:
+  podSelector: {}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: linkerd-viz }
+      ports:
+        - { protocol: TCP, port: 4191 }

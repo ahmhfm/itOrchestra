@@ -11,8 +11,8 @@ It is built incrementally, one step at a time, following the project plan
 | Step | Component | Status |
 |------|-----------|--------|
 | 0.1 | Kubernetes cluster (K3s / RKE2) + CNI + Storage + Ingress + LB + Namespaces + NetworkPolicies | Done (dev) |
-| 0.2 | Linkerd service mesh | Installed (dev) - control plane + viz healthy (`linkerd check` √); injection smoke test needs a stable cluster window |
-| 0.3 | YARP API Gateway | Not started |
+| 0.2 | Linkerd service mesh (+ Linkerd CNI plugin chained on Cilium for `restricted` namespaces) | Done (dev) - `linkerd check` √, verify-0.2 6/6 |
+| 0.3 | YARP API Gateway (TLS, routing, rate limit, CORS, correlation-id; JWT deferred to 0.4) | In progress (dev) |
 | 0.4 | Keycloak | Not started |
 | 0.5 | HashiCorp Vault | Not started |
 | 0.6 | Redis (Cache + Streams) | Not started |

@@ -32,6 +32,20 @@ hubble:
   ui:
     enabled: true
 
-# Cilium replaces flannel; it provides the only CNI in the cluster.
+# Cilium is the primary CNI. We chain Linkerd's CNI plugin on top of it so meshed
+# pods in 'restricted' PodSecurity namespaces don't need the NET_ADMIN/NET_RAW
+# proxy-init container. See docs/runbook-0.3.md.
+#
+# cni.exclusive=false      -> Cilium does not delete other CNI config files.
+# cni.customConf + configMap -> Cilium writes the explicit [cilium-cni, linkerd-cni]
+#   chain from the 'cni-configuration' ConfigMap (k8s/cluster/cilium/cni-chain-configmap.yaml)
+#   instead of reconciling its conflist back to Cilium-only and stripping linkerd-cni.
 cni:
-  exclusive: true
+  exclusive: false
+  customConf: true
+  configMap: cni-configuration
+
+# Preserve the ClusterIP on packets so Linkerd's service discovery works even if
+# socket-level load balancing is ever enabled (no-op while kubeProxyReplacement=false).
+socketLB:
+  hostNamespaceOnly: true
