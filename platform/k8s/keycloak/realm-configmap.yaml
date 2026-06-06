@@ -1,0 +1,91 @@
+# Declarative realm imported on startup via `start --import-realm`.
+# DEV ONLY: the api-gateway client secret and the test user password below are
+# placeholders for local development. In staging/prod these come from Vault (step 0.5)
+# and the realm is provisioned without embedded secrets.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: keycloak-realm-itorchestra-dev
+  namespace: keycloak
+  labels:
+    app: keycloak
+data:
+  itorchestra-dev-realm.json: |
+    {
+      "realm": "itorchestra-dev",
+      "enabled": true,
+      "sslRequired": "external",
+      "registrationAllowed": false,
+      "bruteForceProtected": true,
+      "accessTokenLifespan": 900,
+      "ssoSessionIdleTimeout": 1800,
+      "ssoSessionMaxLifespan": 36000,
+      "revokeRefreshToken": true,
+      "refreshTokenMaxReuse": 0,
+      "defaultSignatureAlgorithm": "RS256",
+      "roles": {
+        "realm": [
+          { "name": "platform.admin", "description": "itOrchestra platform administrator" },
+          { "name": "platform.user", "description": "Standard itOrchestra user" }
+        ]
+      },
+      "clients": [
+        {
+          "clientId": "api-gateway",
+          "name": "itOrchestra API Gateway",
+          "description": "Confidential client fronted by YARP (Authorization Code + PKCE, plus service account).",
+          "enabled": true,
+          "protocol": "openid-connect",
+          "publicClient": false,
+          "clientAuthenticatorType": "client-secret",
+          "secret": "dev-gateway-secret-change-me",
+          "standardFlowEnabled": true,
+          "directAccessGrantsEnabled": true,
+          "serviceAccountsEnabled": true,
+          "redirectUris": ["*"],
+          "webOrigins": ["+"],
+          "attributes": {
+            "pkce.code.challenge.method": "S256",
+            "post.logout.redirect.uris": "+"
+          },
+          "protocolMappers": [
+            {
+              "name": "audience-api-gateway",
+              "protocol": "openid-connect",
+              "protocolMapper": "oidc-audience-mapper",
+              "config": {
+                "included.client.audience": "api-gateway",
+                "id.token.claim": "false",
+                "access.token.claim": "true"
+              }
+            },
+            {
+              "name": "realm-roles",
+              "protocol": "openid-connect",
+              "protocolMapper": "oidc-usermodel-realm-role-mapper",
+              "config": {
+                "claim.name": "roles",
+                "jsonType.label": "String",
+                "multivalued": "true",
+                "id.token.claim": "false",
+                "access.token.claim": "true"
+              }
+            }
+          ]
+        }
+      ],
+      "users": [
+        {
+          "username": "dev",
+          "enabled": true,
+          "emailVerified": true,
+          "firstName": "Dev",
+          "lastName": "User",
+          "email": "dev@itorchestra.local",
+          "credentials": [
+            { "type": "password", "value": "devpass", "temporary": false }
+          ],
+          "realmRoles": ["platform.user"]
+        }
+      ]
+    }

@@ -58,17 +58,22 @@ try
             }
         }));
 
-    // Edge rate limiting. Until JWT lands (0.4) we partition by client IP.
+    // Edge rate limiting. We partition by client IP. Identity-provider paths (Keycloak
+    // admin console + OIDC endpoints) fan out into many static-asset requests on first
+    // load, so they get a more generous bucket than the default edge limit.
     builder.Services.AddRateLimiter(options =>
     {
         options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
         options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
-            RateLimitPartition.GetFixedWindowLimiter(ClientKey(context), _ => new FixedWindowRateLimiterOptions
+        {
+            var (bucket, limit) = IsIdentityPath(context.Request.Path) ? ("idp", 300) : ("edge", 60);
+            return RateLimitPartition.GetFixedWindowLimiter($"{bucket}:{ClientKey(context)}", _ => new FixedWindowRateLimiterOptions
             {
-                PermitLimit = 60,
+                PermitLimit = limit,
                 Window = TimeSpan.FromMinutes(1),
                 QueueLimit = 0
-            }));
+            });
+        });
         options.AddPolicy("anonymous", context =>
             RateLimitPartition.GetFixedWindowLimiter(ClientKey(context), _ => new FixedWindowRateLimiterOptions
             {
@@ -174,6 +179,12 @@ finally
 
 static string ClientKey(HttpContext context) =>
     context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+
+static bool IsIdentityPath(PathString path) =>
+    path.StartsWithSegments("/realms", StringComparison.OrdinalIgnoreCase)
+    || path.StartsWithSegments("/resources", StringComparison.OrdinalIgnoreCase)
+    || path.StartsWithSegments("/admin", StringComparison.OrdinalIgnoreCase)
+    || path.StartsWithSegments("/js", StringComparison.OrdinalIgnoreCase);
 
 static string GatewayVersion() =>
     typeof(Program).Assembly.GetName().Version?.ToString() ?? "0.0.0";

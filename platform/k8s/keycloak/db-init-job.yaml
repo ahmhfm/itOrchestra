@@ -1,0 +1,66 @@
+# One-time bootstrap of Keycloak's database objects on the private MSSQL instance.
+# This is infrastructure provisioning (the DBA-equivalent "create the database + login"),
+# NOT application data access: Keycloak then manages its own schema/tables inside this DB.
+#
+# Not meshed (linkerd.io/inject=disabled): it's a short-lived Job that only opens a TCP
+# connection to MSSQL in the same namespace, so we avoid any Job-completion edge cases.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: keycloak-db-init
+  namespace: keycloak
+  labels:
+    app: keycloak-db-init
+spec:
+  backoffLimit: 6
+  ttlSecondsAfterFinished: 600
+  template:
+    metadata:
+      labels:
+        app: keycloak-db-init
+      annotations:
+        linkerd.io/inject: disabled
+    spec:
+      restartPolicy: OnFailure
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: sqlcmd
+          # Reuse the SQL Server image (already pulled for the StatefulSet); it bundles
+          # sqlcmd at /opt/mssql-tools18/bin. -C trusts the server's self-signed cert.
+          image: mcr.microsoft.com/mssql/server:2022-latest
+          env:
+            - name: SA_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: keycloak-db
+                  key: sa-password
+            - name: KC_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: keycloak-db
+                  key: kc-password
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -e
+              SQLCMD="/opt/mssql-tools18/bin/sqlcmd -S keycloak-mssql -U sa -P $SA_PASSWORD -C -b"
+              echo "==> Waiting for MSSQL to accept connections..."
+              for i in $(seq 1 60); do
+                if $SQLCMD -Q "SELECT 1" >/dev/null 2>&1; then echo "    MSSQL is up."; break; fi
+                echo "    attempt $i: not ready yet, retrying in 5s"; sleep 5
+              done
+              echo "==> Creating database 'keycloak' (if missing)"
+              $SQLCMD -Q "IF DB_ID('keycloak') IS NULL CREATE DATABASE keycloak;"
+              echo "==> Creating login 'keycloak' (if missing)"
+              $SQLCMD -Q "IF SUSER_ID('keycloak') IS NULL CREATE LOGIN keycloak WITH PASSWORD='$KC_DB_PASSWORD', CHECK_POLICY=OFF;"
+              echo "==> Mapping user 'keycloak' -> db_owner on the keycloak DB"
+              $SQLCMD -d keycloak -Q "IF USER_ID('keycloak') IS NULL CREATE USER keycloak FOR LOGIN keycloak; ALTER ROLE db_owner ADD MEMBER keycloak;"
+              echo "==> Keycloak DB bootstrap complete."
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]

@@ -1,0 +1,20 @@
+# ns-gateway is default-deny (egress). The gateway must reach Keycloak's HTTP port to
+# proxy /realms, /admin, /resources, ... so open egress from ns-gateway -> keycloak:8080.
+#
+# The 'keycloak' namespace itself is baseline (no default-deny), so ingress is already
+# open; we only need the gateway-side egress rule here. Per-service egress to Keycloak's
+# JWKS is opened in each microservice's own step.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-to-keycloak
+  namespace: ns-gateway
+spec:
+  podSelector: {}
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: keycloak }
+      ports:
+        - { protocol: TCP, port: 8080 }

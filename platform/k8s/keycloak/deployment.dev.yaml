@@ -1,0 +1,133 @@
+# Keycloak (dev) - central identity provider, backed by its private MSSQL.
+# Lives in the 'keycloak' namespace (baseline PSA + linkerd.io/inject=enabled), so the
+# pod is meshed (mTLS) and runs non-root.
+#
+# Exposure: NOT a LoadBalancer. Reached only in-cluster on :8080; external clients hit it
+# through the YARP gateway (single public entry point). TLS terminates at the gateway, so
+# Keycloak speaks HTTP internally and trusts X-Forwarded-* (KC_PROXY_HEADERS=xforwarded).
+#
+# KC_HOSTNAME is injected at deploy time by install-dev.sh (set to the gateway's public
+# https URL) so issuer/redirect URLs are correct behind the proxy.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: keycloak
+  namespace: keycloak
+  labels:
+    app: keycloak
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: keycloak
+  template:
+    metadata:
+      labels:
+        app: keycloak
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: keycloak
+          image: quay.io/keycloak/keycloak:26.6.3
+          args: ["start", "--import-realm"]
+          env:
+            - name: KC_DB
+              value: "mssql"
+            - name: KC_DB_URL
+              value: "jdbc:sqlserver://keycloak-mssql.keycloak.svc.cluster.local:1433;databaseName=keycloak;encrypt=true;trustServerCertificate=true"
+            - name: KC_DB_USERNAME
+              value: "keycloak"
+            - name: KC_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: keycloak-db
+                  key: kc-password
+            - name: KC_BOOTSTRAP_ADMIN_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: keycloak-admin
+                  key: username
+            - name: KC_BOOTSTRAP_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: keycloak-admin
+                  key: password
+            # Behind the YARP gateway (TLS terminated there).
+            - name: KC_HTTP_ENABLED
+              value: "true"
+            - name: KC_PROXY_HEADERS
+              value: "xforwarded"
+            - name: KC_HEALTH_ENABLED
+              value: "true"
+            - name: KC_HOSTNAME_STRICT
+              value: "true"
+            # KC_HOSTNAME is patched in by install-dev.sh (https://<gateway-ip>).
+            - name: KC_HOSTNAME
+              value: "PLACEHOLDER_SET_BY_INSTALL"
+          ports:
+            - name: http
+              containerPort: 8080
+            - name: management
+              containerPort: 9000
+          startupProbe:
+            httpGet:
+              path: /health/started
+              port: 9000
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            failureThreshold: 60     # first boot runs an auto-build; allow up to ~10 min
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: 9000
+            periodSeconds: 10
+            failureThreshold: 6
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: 9000
+            periodSeconds: 20
+            failureThreshold: 6
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "768Mi"
+            limits:
+              cpu: "1500m"
+              memory: "1536Mi"
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: realm-import
+              mountPath: /opt/keycloak/data/import
+              readOnly: true
+      volumes:
+        - name: realm-import
+          configMap:
+            name: keycloak-realm-itorchestra-dev
+            items:
+              - key: itorchestra-dev-realm.json
+                path: itorchestra-dev-realm.json
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: keycloak
+  namespace: keycloak
+  labels:
+    app: keycloak
+spec:
+  type: ClusterIP
+  selector:
+    app: keycloak
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+      protocol: TCP

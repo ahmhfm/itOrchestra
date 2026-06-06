@@ -1,0 +1,104 @@
+# Keycloak's PRIVATE MSSQL (Database-per-Service): only Keycloak ever talks to it.
+# Lives in the 'keycloak' namespace (baseline PSA + linkerd.io/inject=enabled).
+#
+# Linkerd: TDS (port 1433) is a server-speaks-first protocol, so it must be marked
+# opaque or the meshed proxy's protocol detection would stall. The opaque-ports
+# annotation makes Linkerd treat 1433 as plain TCP (still mTLS'd) on this destination.
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: keycloak-mssql
+  namespace: keycloak
+  labels:
+    app: keycloak-mssql
+  annotations:
+    config.linkerd.io/opaque-ports: "1433"
+spec:
+  clusterIP: None          # headless: governs the StatefulSet + resolves to the pod IP
+  selector:
+    app: keycloak-mssql
+  ports:
+    - name: mssql
+      port: 1433
+      targetPort: 1433
+      protocol: TCP
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: keycloak-mssql
+  namespace: keycloak
+  labels:
+    app: keycloak-mssql
+spec:
+  serviceName: keycloak-mssql
+  replicas: 1
+  selector:
+    matchLabels:
+      app: keycloak-mssql
+  template:
+    metadata:
+      labels:
+        app: keycloak-mssql
+      annotations:
+        config.linkerd.io/opaque-ports: "1433"
+    spec:
+      securityContext:
+        # The 2022 image runs as the non-root 'mssql' user (uid 10001); fsGroup lets it
+        # write to the Longhorn-backed PVC.
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: mssql
+          image: mcr.microsoft.com/mssql/server:2022-latest
+          ports:
+            - containerPort: 1433
+              name: mssql
+          env:
+            - name: ACCEPT_EULA
+              value: "Y"
+            - name: MSSQL_PID
+              value: "Developer"
+            - name: MSSQL_SA_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: keycloak-db
+                  key: sa-password
+          readinessProbe:
+            tcpSocket:
+              port: 1433
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            failureThreshold: 30
+          livenessProbe:
+            tcpSocket:
+              port: 1433
+            initialDelaySeconds: 60
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "2Gi"      # SQL Server on Linux requires >= 2 GiB
+            limits:
+              cpu: "1500m"
+              memory: "3Gi"
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: data
+              mountPath: /var/opt/mssql
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: itorchestra-longhorn
+        resources:
+          requests:
+            storage: 8Gi
