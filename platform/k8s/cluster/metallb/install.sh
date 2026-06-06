@@ -18,7 +18,6 @@ helm repo add metallb https://metallb.github.io/metallb >/dev/null 2>&1 || true
 helm repo update metallb >/dev/null
 
 kubectl get ns "${METALLB_NS}" >/dev/null 2>&1 || kubectl create ns "${METALLB_NS}"
-# MetalLB speaker needs elevated privileges; relax PSA on its namespace.
 kubectl label ns "${METALLB_NS}" \
   pod-security.kubernetes.io/enforce=privileged --overwrite >/dev/null
 

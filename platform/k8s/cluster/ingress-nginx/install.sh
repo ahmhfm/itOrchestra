@@ -34,6 +34,6 @@ for i in $(seq 1 30); do
   sleep 3
 done
 echo "    ingress-nginx EXTERNAL-IP: ${EXT_IP:-<pending>}"
-kubectl -n "${NS}" get svc ingress-nginx-controlle
+kubectl -n "${NS}" get svc ingress-nginx-controller
 
 echo "==> [0.1/ingress-nginx] Done."
