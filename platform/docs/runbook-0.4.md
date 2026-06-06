@@ -111,6 +111,7 @@ kubectl -n keycloak get secret keycloak-admin -o jsonpath='{.data.password}' | b
 | Discovery issuer is `http://...` or wrong host | gateway not forwarding `X-Forwarded-Proto`, or `KC_PROXY_HEADERS!=xforwarded`. |
 | Admin console assets 429 | edge rate limit; IdP paths use the relaxed 300/min bucket - rebuild/roll the gateway if it predates the route change. |
 | `/realms/...` 404 via gateway | gateway image predates the Keycloak routes - rebuild + `rollout restart deploy/gateway`. |
+| Gateway gets 504 + `l5d-proxy-error: service in fail-fast`; `cilium monitor` shows `drop (Policy denied) ... -> <pod>:4143` | **meshed -> meshed** traffic dials the destination's Linkerd inbound port **4143**, not the app port. The egress NetworkPolicy must allow TCP `4143` to the target namespace (see `k8s/keycloak/networkpolicy.yaml`). Applies to every future service-to-service policy. |
 | Keycloak can't reach DB | wrong `kc-password` (secret regenerated after DB init) - delete the DB-init Job + secret consistently, or reset the login password. |
 
 ## Production notes

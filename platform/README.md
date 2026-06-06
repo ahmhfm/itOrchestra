@@ -13,7 +13,7 @@ It is built incrementally, one step at a time, following the project plan
 | 0.1 | Kubernetes cluster (K3s / RKE2) + CNI + Storage + Ingress + LB + Namespaces + NetworkPolicies | Done (dev) |
 | 0.2 | Linkerd service mesh (+ Linkerd CNI plugin chained on Cilium for `restricted` namespaces) | Done (dev) - `linkerd check` √, verify-0.2 6/6 |
 | 0.3 | YARP API Gateway (TLS, routing, rate limit, CORS, correlation-id; JWT deferred to 0.4) | Done (dev) - verify-0.3 5/5, LoadBalancer 10.178.95.241 |
-| 0.4 | Keycloak (IAM) + private MSSQL, behind YARP; realm `itorchestra-dev` imported | Done (dev) - verify-0.4 5/5 |
+| 0.4 | Keycloak (IAM) + private MSSQL, behind YARP; realm `itorchestra-dev` imported | Done (dev) - verify-0.4 7/7 |
 | 0.5 | HashiCorp Vault | Not started |
 | 0.6 | Redis (Cache + Streams) | Not started |
 | ... | ... | ... |
