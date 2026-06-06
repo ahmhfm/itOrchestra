@@ -73,7 +73,9 @@ for attempt in 1 2 3 4 5 6; do
   kubectl -n "${SMOKE_NS}" rollout status deploy/smoke --timeout=60s >/dev/null 2>&1 || true
   POD="$(kubectl -n ${SMOKE_NS} get pods -l app=smoke --field-selector=status.phase=Running -o jsonpath='{.items[-1:].metadata.name}' 2>/dev/null || true)"
   [ -z "${POD}" ] && POD="$(kubectl -n ${SMOKE_NS} get pods -l app=smoke -o jsonpath='{.items[-1:].metadata.name}' 2>/dev/null || true)"
-  NCONT="$(kubectl -n ${SMOKE_NS} get pod ${POD} -o jsonpath='{.spec.containers[*].name}' 2>/dev/null || true)"
+  # edge-26+ injects the proxy as a native sidecar (an initContainer with
+  # restartPolicy=Always), so check BOTH .spec.containers and .spec.initContainers.
+  NCONT="$(kubectl -n ${SMOKE_NS} get pod ${POD} -o jsonpath='{.spec.containers[*].name} {.spec.initContainers[*].name}' 2>/dev/null || true)"
   case " ${NCONT} " in
     *linkerd-proxy*) INJECTED="yes"; break ;;
   esac
@@ -84,10 +86,11 @@ done
 echo "    smoke pod (${POD:-none}) containers: ${NCONT:-none}"
 if [ "${INJECTED}" = "yes" ]; then ok "linkerd-proxy sidecar injected"; else bad "no linkerd-proxy sidecar injected after retries"; fi
 kubectl -n "${SMOKE_NS}" wait --for=condition=Ready pod -l app=smoke --timeout=90s >/dev/null 2>&1 || true
-READY="$(kubectl -n ${SMOKE_NS} get pod ${POD} -o jsonpath='{.status.containerStatuses[*].ready}' 2>/dev/null || true)"
+# Use the pod-level Ready condition: it accounts for app container + native-sidecar proxy.
+READY="$(kubectl -n ${SMOKE_NS} get pod ${POD} -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || true)"
 case "${READY}" in
-  *"true true"*) ok "smoke pod Ready 2/2 (mTLS identity issued)" ;;
-  *)             bad "smoke pod not 2/2 Ready (readiness='${READY:-none}')" ;;
+  True) ok "smoke pod Ready (app + linkerd-proxy; mTLS identity issued)" ;;
+  *)    bad "smoke pod not Ready (Ready condition='${READY:-none}')" ;;
 esac
 kubectl delete ns "${SMOKE_NS}" --wait=false >/dev/null 2>&1 || true
 
