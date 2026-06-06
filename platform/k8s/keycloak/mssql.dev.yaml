@@ -85,11 +85,12 @@ spec:
               cpu: "1500m"
               memory: "3Gi"
           securityContext:
+            # SQL Server's sqlservr binary ships with Linux file capabilities, so it must
+            # NOT run with NoNewPrivs (allowPrivilegeEscalation:false) or an emptied
+            # capability bounding set (drop:ALL) - either makes execve fail with EPERM
+            # ("Operation not permitted"). Non-root is enough here (baseline PSA namespace).
             runAsNonRoot: true
             runAsUser: 10001
-            allowPrivilegeEscalation: false
-            capabilities:
-              drop: ["ALL"]
           volumeMounts:
             - name: data
               mountPath: /var/opt/mssql
