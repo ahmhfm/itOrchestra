@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# itOrchestra - Phase 0.1 end-to-end DEV bootstrap (single-node K3s in WSL2).
+# itOrchestra - Phase 0.1 end-to-end DEV bootstrap (single-node K3s on an Ubuntu VM).
 # Runs every sub-step in order. Idempotent; safe to re-run.
 set -euo pipefail
 

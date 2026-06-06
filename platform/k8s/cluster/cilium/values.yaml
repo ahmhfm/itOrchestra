@@ -1,6 +1,6 @@
-# Cilium Helm values - itOrchestra (works for both dev WSL2 and prod K3s).
+# Cilium Helm values - itOrchestra (works for both the dev Ubuntu VM and prod K3s).
 #
-# K3s runs without kube-proxy replacement here for maximum stability (esp. WSL2);
+# K3s runs without kube-proxy replacement here for maximum compatibility;
 # Cilium coexists with the standard kube-proxy. Flip kubeProxyReplacement to "true"
 # in prod once validated on real kernels.
 

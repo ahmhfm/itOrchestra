@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Install K3s server - DEV profile (single node, WSL2).
+# Install K3s server - DEV profile (single-node Ubuntu VM).
 # Idempotent: safe to re-run. Installs config, runs the K3s installer, waits for Ready,
 # and exposes kubeconfig at ~/.kube/config for the current user.
 set -euo pipefail
@@ -11,7 +11,7 @@ CONFIG_SRC="${SCRIPT_DIR}/config.dev.yaml"
 echo "==> [0.1/k3s] Installing K3s server (dev profile)"
 
 if ! command -v systemctl >/dev/null 2>&1 || [ "$(ps -p 1 -o comm= 2>/dev/null)" != "systemd" ]; then
-  echo "ERROR: systemd is not PID 1. Enable systemd in WSL: add '[boot]\\nsystemd=true' to /etc/wsl.conf, then 'wsl --shutdown'." >&2
+  echo "ERROR: systemd is not PID 1. This dev profile targets an Ubuntu VM (systemd is PID 1 by default)." >&2
   exit 1
 fi
 
@@ -23,20 +23,9 @@ if ! command -v k3s >/dev/null 2>&1; then
   curl -sfL https://get.k3s.io | INSTALL_K3S_CHANNEL="${K3S_CHANNEL}" sh -s -
 fi
 
-# WSL2 quirk: the root filesystem is mounted with PRIVATE propagation, which late
-# breaks Longhorn ("path /var/lib/longhorn is mounted on / but it is not a shared
-# mount"). systemd on a normal Linux host re-shares / at boot; WSL does not. This
-# drop-in re-shares / inside k3s's OWN mount namespace right before it starts, so the
-# kubelet/containerd see a shared mount. The leading '-' makes it best-effort/no-op on
-# hosts where / is already shared.
-echo "    installing k3s rshared-mount drop-in (WSL2 Longhorn prerequisite)"
-sudo mkdir -p /etc/systemd/system/k3s.service.d
-sudo tee /etc/systemd/system/k3s.service.d/10-rshared-mount.conf >/dev/null <<'EOF'
-[Service]
-ExecStartPre=-/bin/mount --make-rshared /
-EOF
-sudo systemctl daemon-reload
-echo "    (re)starting k3s to apply config + drop-in"
+# Longhorn requires '/' to be a SHARED mount. A normal Ubuntu VM already re-shares '/' at
+# boot via systemd, so nothing extra is needed here.
+echo "    (re)starting k3s to apply config"
 sudo systemctl restart k3s
 
 echo "==> Waiting for K3s API to become available"

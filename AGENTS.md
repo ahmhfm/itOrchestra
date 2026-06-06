@@ -7,7 +7,7 @@ Persistent project context for AI agents. Keep this file accurate and up to date
 | Item | Value |
 |------|-------|
 | Topology | Single **monorepo** — application code and infrastructure (`platform/`) live together as normal folders |
-| Local path (dev machine) | `D:\itOrchestra\` (mounted at `/mnt/d/itOrchestra` inside WSL2) |
+| Local path (dev machine) | `D:\itOrchestra\` |
 | Remote (`origin`) | `git@github.com:ahmhfm/itOrchestra.git` (SSH) |
 | Default branch | `main` (tracks `origin/main`) |
 | Commit identity | `ahmhfm` <`ahmhfm1@hotmail.com`> |
@@ -32,7 +32,7 @@ the always-on Cursor rule `.cursor/rules/ai-engineering-system.mdc`.
 - Atomic commits may span both application code and `platform/` infrastructure changes.
 - Per-service **independent deployment** is achieved via path-filtered CI pipelines, not by splitting repositories.
 - **Never commit secrets**: `kubeconfig`, `*.kubeconfig`, `k3s.yaml`, `*.pfx`, `*.key`, `*.crt`, `*.env`, `appsettings.*.local.json`, `secrets.json`. Secrets come from HashiCorp Vault (Phase 0.5).
-- Shell (`*.sh`) and YAML (`*.yaml`/`*.yml`) files must use **LF** line endings (enforced via `.gitattributes`) so they run under WSL/Linux.
+- Shell (`*.sh`) and YAML (`*.yaml`/`*.yml`) files must use **LF** line endings (enforced via `.gitattributes`) so they run on Linux.
 - Only create commits when the user explicitly asks.
 
 ## Project structure
@@ -57,12 +57,12 @@ itOrchestra plan/           <- design/planning docs (NOT in this repo)
 | 0.5 | HashiCorp Vault (secrets) | Not started |
 | 0.6 | Redis (cache + Streams) | Not started |
 
-## Dev environment (WSL2)
+## Dev environment (Ubuntu VM)
 
-- Single-node K3s `v1.35.5+k3s1` inside WSL2 distro **Ubuntu-24.04**; node name `itorchestra-dev`.
-- Run `kubectl`/`helm`/`git` inside WSL. `KUBECONFIG=/root/.kube/config` (root user).
-- WSL quirk: a k3s systemd drop-in (`/etc/systemd/system/k3s.service.d/10-rshared-mount.conf`) runs `mount --make-rshared /` before k3s starts — required for Longhorn.
-- If the cluster enters a restart loop or WSL hangs: `wsl --shutdown` from Windows, reopen, re-export `KUBECONFIG`.
-- Default StorageClass: `itorchestra-longhorn`. Ingress LoadBalancer IP (dev): `172.19.16.240`.
+- Single-node K3s `v1.35.5+k3s1` on a dedicated **Ubuntu Server 24.04** VM; node name `itorchestra-dev`.
+- Run `kubectl`/`helm`/`git` on the VM as the normal user. `KUBECONFIG=$HOME/.kube/config`.
+- Provision the VM per [`platform/docs/runbook-vm-setup.md`](platform/docs/runbook-vm-setup.md); `systemd` is PID 1 by default and `/` is shared at boot (no extra mount drop-in needed).
+- To stop/start the env: power off / power on the VM (snapshots enable instant rollback).
+- Default StorageClass: `itorchestra-longhorn`. Ingress LoadBalancer IP (dev): `10.178.95.240`.
 
 See `platform/README.md` and `platform/docs/runbook-0.1.md` for the full infrastructure runbook.

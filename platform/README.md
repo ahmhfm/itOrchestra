@@ -11,7 +11,7 @@ It is built incrementally, one step at a time, following the project plan
 | Step | Component | Status |
 |------|-----------|--------|
 | 0.1 | Kubernetes cluster (K3s / RKE2) + CNI + Storage + Ingress + LB + Namespaces + NetworkPolicies | Done (dev) |
-| 0.2 | Linkerd service mesh | Not started |
+| 0.2 | Linkerd service mesh | Installed (dev) - control plane + viz healthy (`linkerd check` √); injection smoke test needs a stable cluster window |
 | 0.3 | YARP API Gateway | Not started |
 | 0.4 | Keycloak | Not started |
 | 0.5 | HashiCorp Vault | Not started |
@@ -22,8 +22,9 @@ It is built incrementally, one step at a time, following the project plan
 
 Every component ships with two profiles so the same repo serves local development and production:
 
-- **dev** - a single-node K3s cluster running inside **WSL2** on a developer machine.
-  Replica counts are reduced to 1, storage replicas are 1, and MetalLB uses the WSL subnet.
+- **dev** - a single-node K3s cluster running on a dedicated **Ubuntu VM** (provision it via
+  [`docs/runbook-vm-setup.md`](docs/runbook-vm-setup.md)). Replica counts are reduced to 1,
+  storage replicas are 1, and MetalLB uses the VM's LAN subnet.
 - **prod** - a multi-node **K3s** (or RKE2) cluster on real Linux servers
   (HA control plane + worker nodes), production-sized replicas and storage.
 
@@ -56,17 +57,36 @@ platform/
     runbook-0.1.md        Install / verify / teardown runbook
 ```
 
-### Quick start (dev, inside WSL2)
+### Quick start (dev, on the Ubuntu VM)
 
 ```bash
-cd /mnt/d/itOrchestra/platform
-# normalize line endings (in case files were saved from Windows) then run
-sed -i 's/\r$//' bootstrap/00-bootstrap-dev.sh k8s/**/*.sh
+# On the Ubuntu VM (see docs/runbook-vm-setup.md), with the repo cloned at ~/itOrchestra:
+cd ~/itOrchestra/platform
 bash bootstrap/00-bootstrap-dev.sh
 ```
 
 See [`docs/runbook-0.1.md`](docs/runbook-0.1.md) for step-by-step manual instructions,
 verification commands, and teardown.
+
+## Step 0.2 - Service mesh (Linkerd)
+
+Stack: **Linkerd** (edge channel, free OSS) for automatic **mTLS**, retries/timeouts, load
+balancing, and golden metrics on all meshed pod-to-pod traffic. Dev installs via the Linkerd
+CLI with auto-generated certs; prod uses Helm + a Vault-managed trust anchor with cert-manager.
+
+```bash
+cd ~/itOrchestra/platform
+# only if files were copied from Windows: dos2unix bootstrap/*.sh k8s/cluster/linkerd/*.sh
+bash bootstrap/01-mesh-dev.sh            # INSTALL_VIZ=false to skip the dashboard
+```
+
+Layout: `k8s/cluster/linkerd/` (install scripts: dev CLI, viz, prod Helm),
+`bootstrap/01-mesh-dev.sh`, `bootstrap/verify-0.2.sh`.
+
+> Two follow-ups before meshing real workloads in the `restricted` `ns-*` namespaces:
+> (1) install the **Linkerd CNI plugin** (chained with Cilium) so injected pods satisfy the
+> `restricted` PodSecurity profile; (2) add `allow-linkerd` NetworkPolicies so meshed pods can
+> reach the control plane under default-deny. See [`docs/runbook-0.2.md`](docs/runbook-0.2.md).
 
 ## Conventions (from the project rules)
 

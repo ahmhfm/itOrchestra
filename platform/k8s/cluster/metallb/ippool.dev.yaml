@@ -1,9 +1,9 @@
-# MetalLB L2 pool - DEV (WSL2) EXAMPLE.
-# In WSL the node subnet changes between reboots, so bootstrap/install.sh DETECTS the
-# eth0 /24 at runtime and renders the real pool. This file documents the shape and can
-# be applied manually if you pin a static WSL subnet.
+# MetalLB L2 pool - DEV (Ubuntu VM) EXAMPLE.
+# The dev installer auto-detects the VM's primary NIC subnet at runtime and renders the
+# real pool. This file documents the shape and can be applied manually if you pin a
+# static dev subnet.
 #
-# Replace 172.20.0.240-172.20.0.250 with addresses inside your WSL eth0 subnet.
+# Replace 172.20.0.240-172.20.0.250 with addresses inside your VM's LAN subnet.
 apiVersion: metallb.io/v1beta1
 kind: IPAddressPool
 metadata:

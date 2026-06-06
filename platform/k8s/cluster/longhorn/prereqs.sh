@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Longhorn node prerequisites: open-iscsi (+ running iscsid) and NFS client.
-# Run on every node that will host Longhorn storage (in dev, the single WSL node).
+# Run on every node that will host Longhorn storage (in dev, the single Ubuntu VM node).
 set -euo pipefail
 
 echo "==> [0.1/longhorn] Installing node prerequisites (open-iscsi, nfs-common)"

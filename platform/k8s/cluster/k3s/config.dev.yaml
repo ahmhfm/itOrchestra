@@ -1,4 +1,4 @@
-# K3s server config - DEV profile (single node, WSL2)
+# K3s server config - DEV profile (single-node Ubuntu VM)
 # Installed to /etc/rancher/k3s/config.yaml before running the K3s installer.
 #
 # Bundled components are disabled so we own them explicitly:
@@ -6,8 +6,9 @@
 #   disable: traefik                                 -> ingress-nginx provides Ingress
 #   disable: servicelb                               -> MetalLB provides LoadBalancer
 #
-# kube-proxy is intentionally LEFT ENABLED for WSL stability; Cilium runs in
-# the default mode (kubeProxyReplacement=false) alongside kube-proxy.
+# kube-proxy is intentionally LEFT ENABLED; Cilium runs in its default mode
+# (kubeProxyReplacement=false) alongside kube-proxy. On a production-grade kernel you may
+# switch Cilium to kubeProxyReplacement=true and drop kube-proxy (validate on the VM first).
 
 write-kubeconfig-mode: "0644"
 node-name: "itorchestra-dev"

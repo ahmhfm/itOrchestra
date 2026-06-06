@@ -1,7 +1,8 @@
 # Runbook - Phase 0.1: Kubernetes Cluster (K3s)
 
 This runbook covers installing, verifying, and tearing down the itOrchestra Kubernetes
-foundation. The **dev** path runs on a single WSL2 node; the **prod** path runs on real
+foundation. The **dev** path runs on a single **Ubuntu VM** node (see
+[`runbook-vm-setup.md`](runbook-vm-setup.md) to provision it); the **prod** path runs on real
 multi-node Linux servers.
 
 ## Stack
@@ -14,21 +15,23 @@ multi-node Linux servers.
 | LoadBalancer | MetalLB (L2) | `--disable=servicelb` |
 | Storage | Longhorn | needs `open-iscsi` on every node |
 
-## Prerequisites (dev / WSL2)
+## Prerequisites (dev / Ubuntu VM)
 
-1. WSL2 with **systemd enabled** (`/etc/wsl.conf` -> `[boot]\nsystemd=true`, then `wsl --shutdown`).
-   Verify: `ps -p 1 -o comm=` prints `systemd`.
-2. Run everything from inside WSL at `/mnt/d/itOrchestra/platform`.
-3. Normalize line endings if files were edited on Windows:
-   ```bash
-   cd /mnt/d/itOrchestra/platform
-   sed -i 's/\r$//' bootstrap/*.sh k8s/cluster/*/*.sh
-   ```
+1. A dedicated **Ubuntu Server 24.04 VM** provisioned per
+   [`runbook-vm-setup.md`](runbook-vm-setup.md) (systemd is PID 1 by default;
+   verify with `ps -p 1 -o comm=` -> `systemd`).
+2. `curl` and `git` installed; the repo cloned at `~/itOrchestra` (run everything from
+   `~/itOrchestra/platform`).
+3. A stable VM IP (DHCP reservation or static) on a `/24` whose `.240-.250` range can be
+   reserved for MetalLB.
+
+> Files cloned via git already use LF endings. Only if you copy them from Windows do you need
+> to normalize: `dos2unix bootstrap/*.sh k8s/cluster/*/*.sh` (or `sed -i 's/\r$//' ...`).
 
 ## One-shot install (dev)
 
 ```bash
-cd /mnt/d/itOrchestra/platform
+cd ~/itOrchestra/platform
 bash bootstrap/00-bootstrap-dev.sh
 ```
 
@@ -38,13 +41,13 @@ Longhorn -> namespaces -> NetworkPolicies -> verification.
 ## Manual step-by-step (dev)
 
 ```bash
-cd /mnt/d/itOrchestra/platform
+cd ~/itOrchestra/platform
 export KUBECONFIG=$HOME/.kube/config
 
 bash k8s/cluster/k3s/install-server-dev.sh      # 1. K3s (node NotReady until CNI)
 bash bootstrap/install-tools.sh                 # 2. kubectl + helm
 bash k8s/cluster/cilium/install-cilium.sh       # 3. Cilium  (node -> Ready)
-PROFILE=dev bash k8s/cluster/metallb/install.sh # 4. MetalLB (auto-detect WSL subnet)
+PROFILE=dev bash k8s/cluster/metallb/install.sh # 4. MetalLB (auto-detect VM subnet)
 bash k8s/cluster/ingress-nginx/install.sh       # 5. ingress-nginx (LB IP)
 bash k8s/cluster/longhorn/prereqs.sh            # 6a. open-iscsi
 LONGHORN_REPLICAS=1 bash k8s/cluster/longhorn/install.sh  # 6b. Longhorn (default SC)
@@ -82,14 +85,11 @@ bash bootstrap/verify-0.1.sh                    # 9. verify
 | Symptom | Cause / fix |
 |---|---|
 | Node stuck `NotReady` | CNI not installed yet -> run Cilium install. |
-| `cilium` pods CrashLoop in WSL | Kernel eBPF feature missing -> keep `kubeProxyReplacement: false` (already default). |
-| ingress EXTERNAL-IP `<pending>` | MetalLB pool not in node L2 segment -> re-run `metallb/install.sh` (re-detects eth0). |
+| `cilium` pods CrashLoop | Kernel eBPF feature missing -> keep `kubeProxyReplacement: false` (already default). |
+| ingress EXTERNAL-IP `<pending>` | MetalLB pool not in node L2 segment -> re-run `metallb/install.sh` (re-detects the primary NIC). |
+| LB IP not reachable from your host | Use **bridged** VM networking so LB IPs sit on the LAN; with **NAT**, port-forward from the host or use `kubectl port-forward`. See [`runbook-vm-setup.md`](runbook-vm-setup.md) section 4. |
 | PVC stuck `Pending` | `open-iscsi`/`iscsid` not running -> re-run `longhorn/prereqs.sh`. |
-| Longhorn manager `CreateContainerError`: `path "/var/lib/longhorn/" is mounted on "/" but it is not a shared mount` | WSL2 mounts `/` with **private** propagation. `install-server-dev.sh` installs a k3s drop-in (`/etc/systemd/system/k3s.service.d/10-rshared-mount.conf`) that runs `mount --make-rshared /` before k3s starts. If you hit this on an existing cluster, create that drop-in, `systemctl daemon-reload`, `systemctl restart k3s`, then delete the stuck `longhorn-manager` pod so the DaemonSet recreates it. |
-| LB IP not reachable from Windows host | WSL NAT - enable mirrored networking in `.wslconfig` (dev-only; not required inside WSL). |
-| `\r` / `bad interpreter` errors | CRLF line endings -> run the `sed` normalize command above. |
-| k3s service restart loop (all pods restart ~every 2 min; kine "client connection is closing"; repeated "Starting kubelet") | Usually a wedged WSL state, not the config. From Windows: `wsl --shutdown`, wait ~10s, reopen WSL (systemd + k3s start clean). Then `journalctl -u k3s -n 300 --no-pager` to confirm the loop is gone and capture any genuine exit reason before adding more workloads. |
-| WSL/shell becomes unresponsive to all commands | `wsl --shutdown` from Windows PowerShell, then reopen. Re-export `KUBECONFIG=/root/.kube/config` and resume. |
+| `\r` / `bad interpreter` errors | CRLF line endings (only if files were copied from Windows) -> `dos2unix bootstrap/*.sh k8s/cluster/*/*.sh`. |
 
 ## Teardown (dev)
 
