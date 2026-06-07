@@ -17,7 +17,7 @@ It is built incrementally, one step at a time, following the project plan
 | 0.5 | HashiCorp Vault (Raft + Longhorn) + Agent Injector; KV v2 + Kubernetes auth; 0.4 secrets seeded | Done (dev) - verify-0.5 8/8 |
 | 0.6 | Redis (Cache + Streams) - single-node StatefulSet, AOF on Longhorn, AUTH, out of mesh; password mirrored to Vault | Done (dev) - verify-0.6 8/8 |
 | 0.7 | SQL Server Always On AG - reference 2-replica clusterless (read-scale) AG, cert-auth endpoints, auto-seeding; SA mirrored to Vault | Done (dev) - verify-0.7 8/8 |
-| 0.8 | Observability - OpenTelemetry Collector + Tempo + Prometheus + Grafana + AlertManager + OpenSearch; Grafana via YARP; creds mirrored to Vault | Done (dev) - verify-0.8 |
+| 0.8 | Observability - OpenTelemetry Collector + Tempo + Prometheus + Grafana + AlertManager + OpenSearch; Grafana via YARP; creds mirrored to Vault | Done (dev) - verify-0.8 13/13 |
 | ... | ... | ... |
 
 ## Two deployment profiles
