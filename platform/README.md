@@ -15,7 +15,7 @@ It is built incrementally, one step at a time, following the project plan
 | 0.3 | YARP API Gateway (TLS, routing, rate limit, CORS, correlation-id; JWT deferred to 0.4) | Done (dev) - verify-0.3 5/5, LoadBalancer 10.178.95.241 |
 | 0.4 | Keycloak (IAM) + private MSSQL, behind YARP; realm `itorchestra-dev` imported | Done (dev) - verify-0.4 7/7 |
 | 0.5 | HashiCorp Vault (Raft + Longhorn) + Agent Injector; KV v2 + Kubernetes auth; 0.4 secrets seeded | Done (dev) - verify-0.5 8/8 |
-| 0.6 | Redis (Cache + Streams) | Not started |
+| 0.6 | Redis (Cache + Streams) - single-node StatefulSet, AOF on Longhorn, AUTH, out of mesh; password mirrored to Vault | Done (dev) - verify-0.6 8/8 |
 | ... | ... | ... |
 
 ## Two deployment profiles
@@ -115,6 +115,33 @@ under `/vault/secrets/`); see [`ai/skills/vault.md`](../ai/skills/vault.md).
 
 Layout: `k8s/vault/` (`values.yaml`, `install-dev.sh`), `bootstrap/04-vault-dev.sh`,
 `bootstrap/verify-0.5.sh`, [`docs/runbook-0.5.md`](docs/runbook-0.5.md).
+
+## Step 0.6 - Cache + Streams (Redis)
+
+Stack: a single-node **Redis 8** (`redis:8.8.0`) StatefulSet with **AOF persistence** on a
+Longhorn PVC (durability for Streams), **AUTH** required, and `volatile-lru` eviction (only
+TTL'd cache keys are evicted; Streams are preserved). Redis is shared infra and stays **out of
+the Linkerd mesh** (per `redis.md` + the architecture rules); it is internal only (headless
+ClusterIP, no LoadBalancer, no YARP). The password lives in the `redis-auth` Secret and is
+mirrored into **Vault KV** at `secret/itorchestra/shared/redis` for workloads to consume.
+
+```bash
+cd ~/itOrchestra/platform
+bash bootstrap/05-redis-dev.sh
+```
+
+Redis is **the first read source** for configuration + hot data (Cache-Aside; MSSQL is the
+source of truth) and hosts **Streams** for events/Sagas. Apps use `StackExchange.Redis`
+(singleton multiplexer) and reach `redis.redis.svc.cluster.local:6379`. See
+[`ai/skills/redis.md`](../ai/skills/redis.md).
+
+> **dev vs prod:** dev is a single node with AUTH only and `protected-mode`. Prod runs HA
+> (Sentinel or Cluster), **TLS** at transport, per-service **ACL users** (least privilege),
+> and rotates the password from Vault without a restart.
+
+Layout: `k8s/redis/` (`configmap.yaml`, `service.yaml`, `statefulset.yaml`, `install-dev.sh`),
+`bootstrap/05-redis-dev.sh`, `bootstrap/verify-0.6.sh`,
+[`docs/runbook-0.6.md`](docs/runbook-0.6.md).
 
 ## Conventions (from the project rules)
 

@@ -1,0 +1,35 @@
+# Redis configuration (dev) - cache + streams. The password is NOT here; it is injected at
+# runtime via --requirepass from the 'redis-auth' Secret. TLS is added in prod.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: redis-config
+  namespace: redis
+  labels:
+    app: redis
+data:
+  redis.conf: |
+    bind 0.0.0.0 -::1
+    protected-mode yes
+    port 6379
+
+    # Persistence: AOF gives durability for Streams (events/Sagas); periodic RDB snapshots too.
+    appendonly yes
+    appendfsync everysec
+    dir /data
+    save 900 1
+    save 300 10
+    save 60 10000
+
+    # Memory cap; evict ONLY keys that carry a TTL (cache entries). Streams have no TTL, so
+    # they are never evicted (volatile-lru). MSSQL remains the source of truth for cache data.
+    maxmemory 384mb
+    maxmemory-policy volatile-lru
+
+    # Guardrail: the platform rules forbid FLUSHALL. Disable the most destructive commands.
+    rename-command FLUSHALL ""
+    rename-command FLUSHDB ""
+
+    # Slowlog for observability.
+    slowlog-log-slower-than 10000
+    slowlog-max-len 128

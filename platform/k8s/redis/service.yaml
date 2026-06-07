@@ -1,0 +1,18 @@
+# Internal headless Service for the Redis StatefulSet. Clients use redis.redis.svc:6379.
+# No external exposure (no LoadBalancer, no YARP route).
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  namespace: redis
+  labels:
+    app: redis
+spec:
+  clusterIP: None
+  selector:
+    app: redis
+  ports:
+    - name: redis
+      port: 6379
+      targetPort: 6379
+      protocol: TCP
