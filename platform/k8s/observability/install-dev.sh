@@ -37,7 +37,8 @@ wait_ready() {
   kubectl -n "${NS}" wait --for=condition=Ready pod -l "${sel}" --timeout="${timeout}"
 }
 
-echo "==> [0.8/observability] Ensuring the 'observability' namespace (baseline PSA, out of mesh)"
+echo "==> [0.8/observability] Ensuring the 'observability' namespace (privileged PSA, out of mesh)"
+# privileged PSA: node-exporter needs hostNetwork/hostPID + hostPath; baseline would reject it.
 kubectl apply -f - <<'EOF'
 apiVersion: v1
 kind: Namespace
@@ -45,7 +46,7 @@ metadata:
   name: observability
   labels:
     name: observability
-    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/enforce: privileged
   annotations:
     linkerd.io/inject: disabled
 EOF

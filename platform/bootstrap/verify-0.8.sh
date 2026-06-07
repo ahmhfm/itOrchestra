@@ -35,6 +35,7 @@ check_ready "app.kubernetes.io/name=prometheus"         "Prometheus"
 check_ready "app.kubernetes.io/name=alertmanager"       "AlertManager"
 check_ready "app.kubernetes.io/name=grafana"            "Grafana"
 check_ready "app.kubernetes.io/name=opentelemetry-collector" "OTel Collector"
+check_ready "app.kubernetes.io/name=prometheus-node-exporter" "node-exporter (node metrics)"
 
 echo "== 3) OpenSearch cluster health (green/yellow) =="
 HEALTH="$(kubectl -n "${NS}" exec opensearch-0 -- curl -s "http://localhost:9200/_cluster/health" 2>/dev/null || true)"

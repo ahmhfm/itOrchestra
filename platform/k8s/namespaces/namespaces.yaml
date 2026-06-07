@@ -111,12 +111,17 @@ metadata:
 # the other data stores): a meshed Prometheus scraping cross-namespace targets and the
 # server-speaks-first stores (OpenSearch/Tempo) add opaque-port complexity. Apps still emit
 # OTLP to the Collector in-cluster. Prod meshes this namespace for mTLS on the OTLP path.
+#
+# PSA = privileged: node-exporter (kube-prometheus-stack) needs hostNetwork/hostPID + hostPath
+# (/proc, /sys, /) to read node CPU/memory/disk metrics, which 'baseline' forbids. This is a
+# monitoring-only, out-of-mesh infra namespace; prod can instead isolate node-exporter in its
+# own privileged namespace and keep the rest of observability at baseline.
 apiVersion: v1
 kind: Namespace
 metadata:
   name: observability
   labels:
     name: observability
-    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/enforce: privileged
   annotations:
     linkerd.io/inject: disabled
