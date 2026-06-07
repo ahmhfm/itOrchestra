@@ -15,10 +15,13 @@ PASS=0; FAIL=0
 ok()  { echo "  [PASS] $1"; PASS=$((PASS+1)); }
 bad() { echo "  [FAIL] $1"; FAIL=$((FAIL+1)); }
 
-POD="$(kubectl -n "${NS}" get pod -l app=crewai -o jsonpath='{.items[-1:].metadata.name}' 2>/dev/null)"
+# Pick a Running pod (a prior rollout may leave a terminated/Completed pod around).
+POD="$(kubectl -n "${NS}" get pod -l app=crewai --field-selector=status.phase=Running -o jsonpath='{.items[-1:].metadata.name}' 2>/dev/null)"
 
 echo "== 1) ns-crewai is meshed (linkerd-proxy injected) =="
-C="$(kubectl -n "${NS}" get pod "${POD}" -o jsonpath='{.spec.containers[*].name}' 2>/dev/null)"
+# Linkerd may inject the proxy as a native sidecar (initContainers w/ restartPolicy=Always),
+# so check both container lists.
+C="$(kubectl -n "${NS}" get pod "${POD}" -o jsonpath='{.spec.containers[*].name} {.spec.initContainers[*].name}' 2>/dev/null)"
 case " ${C} " in *linkerd-proxy*) ok "linkerd-proxy injected (in mesh)" ;; *) bad "no linkerd-proxy (expected meshed)" ;; esac
 
 echo "== 2) CrewAI pod Ready =="

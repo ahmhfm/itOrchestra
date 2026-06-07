@@ -67,6 +67,10 @@ kubectl -n "${NS}" create configmap crewai-config \
   --from-literal=EMBED_MODEL="bge-m3" \
   --from-literal=LLM_TIMEOUT_S="180" \
   --from-literal=USE_CREWAI="true" \
+  --from-literal=CREWAI_TELEMETRY_OPT_OUT="true" \
+  --from-literal=OTEL_SDK_DISABLED="true" \
+  --from-literal=ANONYMIZED_TELEMETRY="False" \
+  --from-literal=LITELLM_LOCAL_MODEL_COST_MAP="True" \
   --from-literal=QDRANT_URL="http://qdrant.${AI_NS}.svc.cluster.local:6333" \
   --from-literal=DEFAULT_COLLECTION="knowledge_base" \
   --from-literal=DB_HOST="mssql-ag-primary.${MSSQL_NS}.svc.cluster.local" \
@@ -79,6 +83,9 @@ kubectl -n "${NS}" create secret generic crewai-secrets \
   --from-literal=QDRANT_API_KEY="${QKEY}" \
   --from-literal=DB_PASSWORD="${APP_PW}" \
   --dry-run=client -o yaml | kubectl apply -f -
+
+echo "==> Re-applying the AI NetworkPolicy so 'ai' admits ns-crewai (Qdrant/Ollama ingress)"
+kubectl apply -f "${SCRIPT_DIR}/../ai/networkpolicy.yaml"
 
 echo "==> Applying Service, Deployment, NetworkPolicies"
 kubectl apply -f "${SCRIPT_DIR}/service.yaml"
