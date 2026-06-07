@@ -13,13 +13,11 @@ config:
   service:
     enable_tls: false        # dev: plaintext in-cluster. Prod: TLS + mesh.
 
-# API key for all REST/gRPC access, read from the 'qdrant-apikey' Secret (not hardcoded).
-# (/metrics + health endpoints are exempt from the key, so Prometheus needs no creds.)
-apiKey:
-  valueFrom:
-    secretKeyRef:
-      name: qdrant-apikey
-      key: api-key
+# API key for all REST/gRPC access. true => the chart auto-generates a key and stores it in the
+# Secret '<release>-apikey' (= 'qdrant-apikey', data key 'api-key'); it is preserved across
+# upgrades via a helm lookup. (/metrics + health are exempt from the key, so Prometheus needs no
+# creds.) We read this chart-managed Secret for the collections Job, verify, and the Vault mirror.
+apiKey: true
 
 persistence:
   size: 5Gi

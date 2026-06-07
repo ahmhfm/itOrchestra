@@ -23,7 +23,6 @@ CHAT_MODEL="${CHAT_MODEL:-qwen2.5:1.5b}"
 EMBED_MODEL="${EMBED_MODEL:-bge-m3}"
 
 ver_arg() { [ -n "$1" ] && printf -- "--version %s" "$1" || true; }
-gen_key() { openssl rand -hex 32; }
 
 echo "==> [0.9/ai] Ensuring the 'ai' namespace (baseline PSA, out of mesh)"
 kubectl apply -f - <<'EOF'
@@ -41,12 +40,15 @@ EOF
 echo "==> Applying consumption controls (ResourceQuota + LimitRange)"
 kubectl apply -f "${SCRIPT_DIR}/resourcequota.yaml"
 
-echo "==> Ensuring Qdrant API-key Secret"
-if ! kubectl -n "${NS}" get secret qdrant-apikey >/dev/null 2>&1; then
-  kubectl -n "${NS}" create secret generic qdrant-apikey --from-literal=api-key="$(gen_key)"
-  echo "    created secret qdrant-apikey"
-else
-  echo "    secret qdrant-apikey already exists (skip)"
+# The Qdrant chart owns its own Secret 'qdrant-apikey' (auto-generated, data key 'api-key').
+# Remove any stale, non-Helm secret of that name (e.g. from an earlier failed run) so the chart
+# can create+own it; never delete a Helm-managed one.
+if kubectl -n "${NS}" get secret qdrant-apikey >/dev/null 2>&1; then
+  OWNER="$(kubectl -n "${NS}" get secret qdrant-apikey -o jsonpath='{.metadata.labels.app\.kubernetes\.io/managed-by}' 2>/dev/null || true)"
+  if [ "${OWNER}" != "Helm" ]; then
+    echo "==> Removing stale non-Helm secret qdrant-apikey"
+    kubectl -n "${NS}" delete secret qdrant-apikey
+  fi
 fi
 
 echo "==> Adding Helm repo (qdrant)"
