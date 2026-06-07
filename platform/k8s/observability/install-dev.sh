@@ -70,9 +70,18 @@ else
 fi
 
 echo "==> Adding Helm repos"
-helm repo add prometheus-community https://prometheus-community.github.io/helm-charts >/dev/null 2>&1 || true
-helm repo add grafana              https://grafana.github.io/helm-charts             >/dev/null 2>&1 || true
-helm repo add open-telemetry       https://open-telemetry.github.io/opentelemetry-helm-charts >/dev/null 2>&1 || true
+# Retry the index fetch: a transient network blip would otherwise leave a repo unregistered
+# and fail the install. --force-update refreshes the URL if the repo name already exists.
+add_repo() {
+  for i in 1 2 3; do
+    helm repo add "$1" "$2" --force-update >/dev/null 2>&1 && return 0
+    echo "    retry helm repo add $1 ($i/3)"; sleep 3
+  done
+  echo "    !! failed to add Helm repo '$1' ($2)" >&2; return 1
+}
+add_repo prometheus-community https://prometheus-community.github.io/helm-charts
+add_repo grafana              https://grafana.github.io/helm-charts
+add_repo open-telemetry       https://open-telemetry.github.io/opentelemetry-helm-charts
 helm repo update prometheus-community grafana open-telemetry >/dev/null
 
 echo "==> Deploying OpenSearch (logs store)"
