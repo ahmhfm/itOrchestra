@@ -18,7 +18,7 @@ It is built incrementally, one step at a time, following the project plan
 | 0.6 | Redis (Cache + Streams) - single-node StatefulSet, AOF on Longhorn, AUTH, out of mesh; password mirrored to Vault | Done (dev) - verify-0.6 8/8 |
 | 0.7 | SQL Server Always On AG - reference 2-replica clusterless (read-scale) AG, cert-auth endpoints, auto-seeding; SA mirrored to Vault | Done (dev) - verify-0.7 8/8 |
 | 0.8 | Observability - OpenTelemetry Collector + Tempo + Prometheus + Grafana + AlertManager + OpenSearch; Grafana via YARP; creds mirrored to Vault | Done (dev) - verify-0.8 13/13 |
-| 0.9 | AI layer - Qdrant 3-node cluster (5 RAG collections) + vLLM (GPU, Qwen2.5-1.5B) + Ollama (CPU, bge-m3); internal-only, API-key auth, NetworkPolicy-fenced; metrics to Prometheus; keys mirrored to Vault | Done (dev) - verify-0.9 |
+| 0.9 | AI layer - Qdrant 3-node cluster (5 RAG collections) + Ollama (CPU) serving chat `qwen2.5:1.5b` + embeddings `bge-m3` (no GPU on this VM; vLLM/GPU is the prod path); internal-only, NetworkPolicy-fenced; Qdrant metrics to Prometheus; endpoints/key mirrored to Vault | Done (dev) - verify-0.9 |
 | ... | ... | ... |
 
 ## Two deployment profiles
@@ -219,36 +219,36 @@ Layout: `k8s/observability/` (`opensearch/`, `tempo/values.yaml`,
 A **fully internal** AI platform: nothing is exposed outside the cluster, and inference data
 never leaves the environment. **Qdrant** runs as a 3-node cluster (the RAG vector store) with
 five collections - `knowledge_base`, `past_incidents`, `policies`, `scripts`, `device_profiles`
-(bge-m3 = 1024 dims, Cosine, 2 shards, replication_factor 2). **vLLM** serves the chat LLM
-(`Qwen2.5-1.5B-Instruct`) on the node's NVIDIA GPU via an OpenAI-compatible API; **Ollama**
-serves the **bge-m3** embedding model on CPU (so the 6 GB GPU stays dedicated to generation).
-All three live in the `ai` namespace, out of the Linkerd mesh, fenced by **NetworkPolicies**
-(only the microservice namespaces + Prometheus may reach them) and protected by **API keys**.
+(bge-m3 = 1024 dims, Cosine, 2 shards, replication_factor 2). This dev VM has **no GPU**, so
+**Ollama** serves **both** the chat LLM (`qwen2.5:1.5b`) and the **bge-m3** embedding model on
+CPU. (**vLLM** on an NVIDIA GPU node is the production chat path; its manifests ship under
+`vllm/` + `gpu/` but are **not deployed in dev**.) Everything lives in the `ai` namespace, out of
+the Linkerd mesh, fenced by **NetworkPolicies** (only the microservice namespaces + Prometheus
+may reach it); Qdrant is protected by an **API key**.
 
 ```bash
 cd ~/itOrchestra/platform
 bash bootstrap/08-ai-dev.sh
 ```
 
-The installer deploys the **NVIDIA device plugin** (and fails early if no `nvidia.com/gpu` is
-advertised), Qdrant via Helm, runs an idempotent Job to create the five collections, deploys
-Ollama and pulls bge-m3, deploys vLLM (first start downloads the model weights into a Longhorn
-HF cache - a one-time provisioning fetch), applies the **Models Catalog**, **ResourceQuota /
-LimitRange**, **NetworkPolicies**, and **ServiceMonitors** (vLLM + Qdrant `/metrics` -> the 0.8
-Prometheus), and mirrors endpoints + keys into **Vault KV** (`secret/itorchestra/shared/ai`).
+The installer deploys Qdrant via Helm, runs an idempotent Job to create the five collections,
+deploys Ollama and pulls `bge-m3` + `qwen2.5:1.5b` (a one-time provisioning fetch), applies the
+**Models Catalog**, **ResourceQuota / LimitRange**, and **NetworkPolicies**, and mirrors
+endpoints + the Qdrant key into **Vault KV** (`secret/itorchestra/shared/ai`). Qdrant's own
+ServiceMonitor (Helm) feeds `/metrics` to the Phase 0.8 Prometheus.
 
-> **dev vs prod:** dev runs the 3 Qdrant peers on one node (replication is nominal), a small
-> chat model on a 6 GB GPU, plaintext in-cluster, and allows one-time HTTPS egress to pull model
-> weights. Prod spreads Qdrant across real nodes, pulls weights from an **internal mirror** (no
-> internet egress), serves larger models (Llama 3 / Qwen 2.5 / Mixtral) on dedicated GPU nodes,
-> meshes the namespace for mTLS, enforces per-caller rate limiting at the consuming services
-> (Polly) / an internal AI BFF, and pins all image/chart versions. Integration with the AI layer
+> **dev vs prod:** dev runs the 3 Qdrant peers on one node (replication is nominal) and the chat
+> LLM on **CPU via Ollama** (slow but functional), plaintext in-cluster, with one-time HTTPS
+> egress to pull model weights. Prod spreads Qdrant across real nodes, pulls weights from an
+> **internal mirror** (no internet egress), serves larger models (Llama 3 / Qwen 2.5 / Mixtral)
+> on **vLLM/GPU** nodes, meshes the namespace for mTLS, enforces per-caller rate limiting at the
+> consuming services (Polly) / an internal AI BFF, and pins all image/chart versions. Integration
 > follows the project's "HTTP + Polly resilience" rule.
 
-Layout: `k8s/ai/` (`gpu/nvidia-device-plugin.yaml`, `qdrant/{values.yaml,collections-init.yaml}`,
-`vllm/{deployment.yaml,service.yaml}`, `ollama/{deployment.yaml,service.yaml}`,
-`models-catalog.yaml`, `resourcequota.yaml`, `networkpolicy.yaml`, `servicemonitors.yaml`,
-`install-dev.sh`), `bootstrap/08-ai-dev.sh`, `bootstrap/verify-0.9.sh`,
+Layout: `k8s/ai/` (`qdrant/{values.yaml,collections-init.yaml}`,
+`ollama/{deployment.yaml,service.yaml}`, `models-catalog.yaml`, `resourcequota.yaml`,
+`networkpolicy.yaml`, `install-dev.sh`; plus the prod/GPU path `vllm/{deployment,service}.yaml` +
+`gpu/nvidia-device-plugin.yaml`), `bootstrap/08-ai-dev.sh`, `bootstrap/verify-0.9.sh`,
 [`docs/runbook-0.9.md`](docs/runbook-0.9.md).
 
 ## Conventions (from the project rules)

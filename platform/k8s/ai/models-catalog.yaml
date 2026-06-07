@@ -13,23 +13,25 @@ data:
     {
       "version": "1",
       "updated": "2026-06-07",
+      "profile": "dev-cpu",
       "defaults": {
-        "chat": "qwen2.5-1.5b-instruct",
+        "chat": "qwen2.5:1.5b",
         "embedding": "bge-m3"
       },
       "models": [
         {
-          "name": "qwen2.5-1.5b-instruct",
+          "name": "qwen2.5:1.5b",
           "family": "Qwen2.5",
           "version": "1.5B-Instruct",
           "task": "chat",
-          "engine": "vllm",
-          "runtime": "gpu",
-          "endpoint": "http://vllm.ai.svc.cluster.local:8000/v1",
+          "engine": "ollama",
+          "runtime": "cpu",
+          "endpoint": "http://ollama.ai.svc.cluster.local:11434/v1",
           "api": "openai",
-          "auth": "bearer (Vault: secret/itorchestra/shared/ai#vllm-api-key)",
+          "auth": "none (internal, NetworkPolicy-fenced)",
           "context_length": 8192,
-          "languages": ["ar", "en", "multi"]
+          "languages": ["ar", "en", "multi"],
+          "active": true
         },
         {
           "name": "bge-m3",
@@ -42,7 +44,23 @@ data:
           "api": "ollama",
           "dimensions": 1024,
           "distance": "Cosine",
-          "languages": ["ar", "en", "multi"]
+          "languages": ["ar", "en", "multi"],
+          "active": true
+        },
+        {
+          "name": "qwen2.5-1.5b-instruct",
+          "family": "Qwen2.5",
+          "version": "1.5B-Instruct",
+          "task": "chat",
+          "engine": "vllm",
+          "runtime": "gpu",
+          "endpoint": "http://vllm.ai.svc.cluster.local:8000/v1",
+          "api": "openai",
+          "auth": "bearer (Vault: secret/itorchestra/shared/ai#vllm-api-key)",
+          "context_length": 8192,
+          "languages": ["ar", "en", "multi"],
+          "active": false,
+          "note": "production GPU path; not deployed in the dev/CPU profile"
         }
       ],
       "vector_store": {

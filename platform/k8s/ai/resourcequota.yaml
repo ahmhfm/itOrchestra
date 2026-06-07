@@ -1,7 +1,9 @@
 # Consumption controls for the AI namespace (Phase 0.9). The ResourceQuota caps the whole
-# namespace (incl. the single GPU); the LimitRange supplies sane per-container defaults so no
-# workload can grab the whole node. Per-user request rate limiting is enforced by the calling
-# services (Polly) / a future internal AI BFF - there is no public gateway in front of AI.
+# namespace; the LimitRange supplies sane per-container defaults so no workload can grab the
+# whole node. Per-user request rate limiting is enforced by the calling services (Polly) / a
+# future internal AI BFF - there is no public gateway in front of AI.
+# (dev/CPU profile: no GPU on this VM. When deploying the vLLM/GPU path, add
+#  requests.nvidia.com/gpu / limits.nvidia.com/gpu here.)
 apiVersion: v1
 kind: ResourceQuota
 metadata:
@@ -15,8 +17,6 @@ spec:
     requests.memory: 12Gi
     limits.cpu: "10"
     limits.memory: 20Gi
-    requests.nvidia.com/gpu: "1"
-    limits.nvidia.com/gpu: "1"
     persistentvolumeclaims: "12"
 ---
 apiVersion: v1

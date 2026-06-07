@@ -1,6 +1,7 @@
-# Ollama (Phase 0.9) - CPU embedding server for bge-m3 (1024-dim, multilingual incl. Arabic).
-# Kept on CPU so the 6 GB GPU stays dedicated to vLLM generation. Internal only. The bge-m3
-# model is pulled once at provisioning (install-dev.sh) into a Longhorn-backed store.
+# Ollama (Phase 0.9, dev/CPU profile) - serves BOTH the chat LLM (qwen2.5:1.5b) and the
+# bge-m3 embedding model (1024-dim, multilingual incl. Arabic) on CPU, since this VM has no GPU.
+# Internal only. Models are pulled once at provisioning (install-dev.sh) into a Longhorn store.
+# (In production the chat LLM moves to vLLM on a GPU node; see vllm/ + docs/runbook-0.9.md.)
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -48,9 +49,11 @@ spec:
               value: "0.0.0.0"
             - name: OLLAMA_MODELS
               value: /root/.ollama/models
-            # Embeddings only -> keep a single model loaded, no parallelism blow-up.
+            # Allow chat + embedding models resident together; modest keep-alive on a busy VM.
             - name: OLLAMA_KEEP_ALIVE
-              value: "24h"
+              value: "1h"
+            - name: OLLAMA_MAX_LOADED_MODELS
+              value: "2"
           readinessProbe:
             httpGet: { path: /, port: 11434 }
             initialDelaySeconds: 5
@@ -62,10 +65,10 @@ spec:
           resources:
             requests:
               cpu: "500m"
-              memory: "2Gi"
+              memory: "3Gi"
             limits:
-              cpu: "2"
-              memory: "4Gi"
+              cpu: "4"
+              memory: "6Gi"
           securityContext:
             allowPrivilegeEscalation: false
           volumeMounts:

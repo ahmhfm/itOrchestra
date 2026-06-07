@@ -1,16 +1,13 @@
 #!/usr/bin/env bash
-# itOrchestra - Phase 0.9 one-shot (dev): deploy the internal AI layer
-# (Qdrant 3-node cluster + 5 RAG collections + vLLM GPU chat + Ollama CPU embeddings),
-# seed Vault, then verify.
+# itOrchestra - Phase 0.9 one-shot (dev/CPU): deploy the internal AI layer
+# (Qdrant 3-node cluster + 5 RAG collections + Ollama serving chat qwen2.5:1.5b + embeddings
+# bge-m3, on CPU), seed Vault, then verify.
 #
-# Prerequisites:
-#   - Phases 0.1-0.8 healthy (cluster + Longhorn, Vault unsealed, kube-prometheus-stack for
-#     ServiceMonitors).
-#   - An NVIDIA GPU on the node with nvidia-container-toolkit installed on the HOST so K3s
-#     registers the NVIDIA runtime (install-dev.sh deploys the device plugin + fails early if
-#     no GPU is advertised).
-# NOTE: vLLM (GPU) + Ollama + 3x Qdrant on top of the full 0.1-0.8 stack is heavy on a single
-# VM; ensure several GiB of RAM headroom. First start pulls model weights (one-time).
+# Prerequisites: Phases 0.1-0.8 healthy (cluster + Longhorn, Vault unsealed, kube-prometheus-
+# stack for the Qdrant ServiceMonitor). No GPU required in this profile - the LLM runs on CPU.
+# NOTE: Ollama (chat + embedding models) + 3x Qdrant on top of the full 0.1-0.8 stack is heavy
+# on a single VM; ensure several GiB of RAM headroom. First start pulls model weights (one-time,
+# ~3.4GB total). CPU chat generation is slow - fine for verification, not for load.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
