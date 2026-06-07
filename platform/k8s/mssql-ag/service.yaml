@@ -1,0 +1,53 @@
+# Headless Service governs the StatefulSet and gives each replica a stable DNS name
+# (mssql-ag-0.mssql-ag.mssql.svc.cluster.local, mssql-ag-1...). The AG endpoint URLs use these.
+apiVersion: v1
+kind: Service
+metadata:
+  name: mssql-ag
+  namespace: mssql
+  labels:
+    app: mssql-ag
+spec:
+  clusterIP: None
+  publishNotReadyAddresses: true     # AG endpoints must resolve even before TDS readiness flips.
+  selector:
+    app: mssql-ag
+  ports:
+    - { name: tds,  port: 1433, targetPort: 1433, protocol: TCP }
+    - { name: hadr, port: 5022, targetPort: 5022, protocol: TCP }
+---
+# Client entry point. In a clusterless AG there is no automatic listener, so this Service
+# pins to the initial PRIMARY (pod mssql-ag-0). After a MANUAL failover, repoint the selector
+# to the new primary (see runbook-0.7.md).
+apiVersion: v1
+kind: Service
+metadata:
+  name: mssql-ag-primary
+  namespace: mssql
+  labels:
+    app: mssql-ag
+    role: primary
+spec:
+  type: ClusterIP
+  selector:
+    app: mssql-ag
+    statefulset.kubernetes.io/pod-name: mssql-ag-0
+  ports:
+    - { name: tds, port: 1433, targetPort: 1433, protocol: TCP }
+---
+# Read-only entry point pinned to the current SECONDARY (pod mssql-ag-1) for read-scale.
+apiVersion: v1
+kind: Service
+metadata:
+  name: mssql-ag-secondary
+  namespace: mssql
+  labels:
+    app: mssql-ag
+    role: secondary
+spec:
+  type: ClusterIP
+  selector:
+    app: mssql-ag
+    statefulset.kubernetes.io/pod-name: mssql-ag-1
+  ports:
+    - { name: tds, port: 1433, targetPort: 1433, protocol: TCP }

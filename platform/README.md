@@ -16,6 +16,7 @@ It is built incrementally, one step at a time, following the project plan
 | 0.4 | Keycloak (IAM) + private MSSQL, behind YARP; realm `itorchestra-dev` imported | Done (dev) - verify-0.4 7/7 |
 | 0.5 | HashiCorp Vault (Raft + Longhorn) + Agent Injector; KV v2 + Kubernetes auth; 0.4 secrets seeded | Done (dev) - verify-0.5 8/8 |
 | 0.6 | Redis (Cache + Streams) - single-node StatefulSet, AOF on Longhorn, AUTH, out of mesh; password mirrored to Vault | Done (dev) - verify-0.6 8/8 |
+| 0.7 | SQL Server Always On AG - reference 2-replica clusterless (read-scale) AG, cert-auth endpoints, auto-seeding; SA mirrored to Vault | Done (dev) - verify-0.7 8/8 |
 | ... | ... | ... |
 
 ## Two deployment profiles
@@ -142,6 +143,37 @@ source of truth) and hosts **Streams** for events/Sagas. Apps use `StackExchange
 Layout: `k8s/redis/` (`configmap.yaml`, `service.yaml`, `statefulset.yaml`, `install-dev.sh`),
 `bootstrap/05-redis-dev.sh`, `bootstrap/verify-0.6.sh`,
 [`docs/runbook-0.6.md`](docs/runbook-0.6.md).
+
+## Step 0.7 - High-availability database (SQL Server Always On AG)
+
+Stack: a **reference** SQL Server 2022 **Always On Availability Group** - two replicas
+(`mssql-ag-0` initial primary, `mssql-ag-1` secondary) forming a **clusterless / read-scale**
+AG (`CLUSTER_TYPE = NONE`) with certificate-authenticated mirroring endpoints (port 5022),
+**automatic seeding**, and **manual** failover. A demo database (`platformref`) is added to the
+AG to prove replication. Out of the Linkerd mesh (DB traffic is secured by TLS at transport);
+internal only. The SA password + connection strings are mirrored into **Vault KV**
+(`secret/itorchestra/shared/mssql-ag`).
+
+```bash
+cd ~/itOrchestra/platform
+bash bootstrap/06-mssql-ag-dev.sh
+```
+
+This is the **reusable HA pattern** (Database-per-Service): each microservice instantiates its
+own AG-backed MSSQL instance with its own private database, own login (EXEC-on-SPs only), and
+Vault-sourced connection string. Entry points: `mssql-ag-primary` (read-write) and
+`mssql-ag-secondary` (read-only / `ApplicationIntent=ReadOnly`). See
+[`ai/skills/mssql.md`](../ai/skills/mssql.md).
+
+> **dev vs prod / limits:** dev runs two replicas on a single node with **manual** failover
+> (clusterless AGs have no automatic listener/failover). Each replica needs >= 2 GiB RAM.
+> Prod uses 3+ replicas across nodes, an automatic-failover mechanism (DH2i DxEnterprise or
+> Pacemaker), real TLS, per-service logins, and a true listener/VIP. After a manual failover
+> in dev, repoint the `mssql-ag-primary` Service selector to the new primary pod.
+
+Layout: `k8s/mssql-ag/` (`mssql-conf-configmap.yaml`, `service.yaml`, `statefulset.yaml`,
+`install-dev.sh`), `bootstrap/06-mssql-ag-dev.sh`, `bootstrap/verify-0.7.sh`,
+[`docs/runbook-0.7.md`](docs/runbook-0.7.md).
 
 ## Conventions (from the project rules)
 

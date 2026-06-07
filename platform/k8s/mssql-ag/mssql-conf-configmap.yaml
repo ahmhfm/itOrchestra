@@ -1,0 +1,13 @@
+# Enables Always On (HADR) on each SQL Server replica. SQL Server reads this file at
+# /var/opt/mssql/mssql.conf on startup; equivalent to `mssql-conf set hadr.hadrenabled 1`.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mssql-ag-conf
+  namespace: mssql
+  labels:
+    app: mssql-ag
+data:
+  mssql.conf: |
+    [hadr]
+    hadrenabled = 1

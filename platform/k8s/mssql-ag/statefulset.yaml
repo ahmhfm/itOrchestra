@@ -1,0 +1,90 @@
+# Reference SQL Server Always On AG (Phase 0.7): two replicas (mssql-ag-0 = initial primary,
+# mssql-ag-1 = secondary) forming a CLUSTERLESS (read-scale) AG. Out of the Linkerd mesh.
+# HADR is enabled via the mounted mssql.conf; the AG itself is created by install-dev.sh.
+#
+# Ports: 1433 (TDS / client) and 5022 (database-mirroring endpoint for AG replication).
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mssql-ag
+  namespace: mssql
+  labels:
+    app: mssql-ag
+spec:
+  serviceName: mssql-ag
+  replicas: 2
+  podManagementPolicy: Parallel       # both replicas can boot together; no ordering dependency.
+  selector:
+    matchLabels:
+      app: mssql-ag
+  template:
+    metadata:
+      labels:
+        app: mssql-ag
+      annotations:
+        linkerd.io/inject: disabled
+    spec:
+      securityContext:
+        fsGroup: 10001                 # let the non-root mssql user write to the Longhorn PVC.
+        seccompProfile:
+          type: RuntimeDefault
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: mssql
+          image: mcr.microsoft.com/mssql/server:2022-latest
+          ports:
+            - { name: tds,      containerPort: 1433 }
+            - { name: hadr,     containerPort: 5022 }
+          env:
+            - name: ACCEPT_EULA
+              value: "Y"
+            - name: MSSQL_PID
+              value: "Developer"
+            - name: MSSQL_AGENT_ENABLED
+              value: "true"
+            - name: MSSQL_SA_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mssql-ag-secret
+                  key: sa-password
+          readinessProbe:
+            tcpSocket: { port: 1433 }
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            failureThreshold: 30
+          livenessProbe:
+            tcpSocket: { port: 1433 }
+            initialDelaySeconds: 60
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "2Gi"            # SQL Server on Linux requires >= 2 GiB to start.
+            limits:
+              cpu: "1500m"
+              memory: "3Gi"
+          securityContext:
+            # sqlservr ships with Linux file capabilities, so it must NOT run with
+            # allowPrivilegeEscalation:false or drop:ALL (execve would fail). Non-root is
+            # enough under the baseline PSA namespace.
+            runAsNonRoot: true
+            runAsUser: 10001
+          volumeMounts:
+            - name: data
+              mountPath: /var/opt/mssql
+            - name: conf
+              mountPath: /var/opt/mssql/mssql.conf
+              subPath: mssql.conf
+      volumes:
+        - name: conf
+          configMap:
+            name: mssql-ag-conf
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: itorchestra-longhorn
+        resources:
+          requests:
+            storage: 4Gi
