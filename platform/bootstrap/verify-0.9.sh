@@ -34,16 +34,23 @@ check_ready "app=ollama" "Ollama"
 
 echo "== 3-6) In-cluster probes (collections / cluster / chat / embeddings) =="
 QKEY="$(kubectl -n "${NS}" get secret qdrant-apikey -o jsonpath='{.data.api-key}' 2>/dev/null | base64 -d)"
+# A first chat call cold-loads the model on CPU (can take a while), so we warm it up (result
+# ignored) before the measured call. Output is captured via 'kubectl logs' - NOT the run -i
+# attach stream - to avoid losing early output to the attach race.
 PROBE='
-set -e
 echo "===COLLECTIONS==="; curl -s -H "api-key: $QKEY" http://qdrant.ai.svc.cluster.local:6333/collections; echo
 echo "===CLUSTER===";     curl -s -H "api-key: $QKEY" http://qdrant.ai.svc.cluster.local:6333/cluster; echo
+curl -s -o /dev/null --max-time 240 -H "Content-Type: application/json" -d "{\"model\":\"'"${CHAT_MODEL}"'\",\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}],\"max_tokens\":1}" http://ollama.ai.svc.cluster.local:11434/v1/chat/completions || true
 echo "===CHAT===";        curl -s --max-time 120 -o /dev/null -w "%{http_code}" -H "Content-Type: application/json" -d "{\"model\":\"'"${CHAT_MODEL}"'\",\"messages\":[{\"role\":\"user\",\"content\":\"ping\"}],\"max_tokens\":5}" http://ollama.ai.svc.cluster.local:11434/v1/chat/completions; echo
 echo "===EMBED===";       curl -s --max-time 120 -H "Content-Type: application/json" -d "{\"model\":\"bge-m3\",\"input\":\"test embedding\"}" http://ollama.ai.svc.cluster.local:11434/api/embed; echo
 echo "===DONE==="
 '
-OUT="$(kubectl -n "${NS}" run verify-ai-$$ --rm -i --restart=Never --image=curlimages/curl:8.11.1 \
-  --env QKEY="${QKEY}" --command -- sh -c "${PROBE}" 2>/dev/null || true)"
+POD="verify-ai-$$"
+kubectl -n "${NS}" run "${POD}" --restart=Never --image=curlimages/curl:8.11.1 \
+  --env QKEY="${QKEY}" --command -- sh -c "${PROBE}" >/dev/null 2>&1 || true
+kubectl -n "${NS}" wait --for=jsonpath='{.status.phase}'=Succeeded "pod/${POD}" --timeout=360s >/dev/null 2>&1 || true
+OUT="$(kubectl -n "${NS}" logs "${POD}" 2>/dev/null || true)"
+kubectl -n "${NS}" delete pod "${POD}" --ignore-not-found >/dev/null 2>&1 || true
 
 echo "-- collections --"
 MISS=""
