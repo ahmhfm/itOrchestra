@@ -3,7 +3,11 @@
 -- EXECs them - no inline SQL in app code). Idempotent: tables guarded with IF NOT EXISTS,
 -- procedures use CREATE OR ALTER. The crewai_app user is granted EXEC only (no table rights),
 -- which enforces the "stored-procedures-only" contract at the database level.
+-- Filtered indexes + CREATE OR ALTER PROCEDURE require these session options ON; sqlcmd may
+-- default QUOTED_IDENTIFIER OFF, so set them explicitly as the first batch.
 SET NOCOUNT ON;
+SET ANSI_NULLS ON;
+SET QUOTED_IDENTIFIER ON;
 GO
 
 -- ---------- Tables (the audit trail of every AI decision) ----------
@@ -23,8 +27,6 @@ BEGIN
         CreatedAt         DATETIME2(3)     NOT NULL CONSTRAINT DF_AiDecision_CA DEFAULT(SYSUTCDATETIME()),
         UpdatedAt         DATETIME2(3)     NOT NULL CONSTRAINT DF_AiDecision_UA DEFAULT(SYSUTCDATETIME())
     );
-    CREATE UNIQUE INDEX UX_AiDecision_Idem ON dbo.AiDecision(IdempotencyKey) WHERE IdempotencyKey IS NOT NULL;
-    CREATE INDEX IX_AiDecision_Agent_Created ON dbo.AiDecision(AgentKind, CreatedAt DESC);
 END
 GO
 
@@ -40,7 +42,6 @@ BEGIN
         CONSTRAINT FK_AiDecisionSource_Decision FOREIGN KEY (DecisionId)
             REFERENCES dbo.AiDecision(DecisionId) ON DELETE CASCADE
     );
-    CREATE INDEX IX_AiDecisionSource_Decision ON dbo.AiDecisionSource(DecisionId);
 END
 GO
 
@@ -56,8 +57,21 @@ BEGIN
         CONSTRAINT FK_AiApproval_Decision FOREIGN KEY (DecisionId)
             REFERENCES dbo.AiDecision(DecisionId) ON DELETE CASCADE
     );
-    CREATE INDEX IX_AiApproval_Status ON dbo.AiApproval(ApprovalStatus, CreatedAt DESC);
 END
+GO
+
+-- ---------- Indexes (separate + self-healing, so a partial prior run can be repaired) ----------
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'UX_AiDecision_Idem' AND object_id = OBJECT_ID(N'dbo.AiDecision'))
+    CREATE UNIQUE INDEX UX_AiDecision_Idem ON dbo.AiDecision(IdempotencyKey) WHERE IdempotencyKey IS NOT NULL;
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_AiDecision_Agent_Created' AND object_id = OBJECT_ID(N'dbo.AiDecision'))
+    CREATE INDEX IX_AiDecision_Agent_Created ON dbo.AiDecision(AgentKind, CreatedAt DESC);
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_AiDecisionSource_Decision' AND object_id = OBJECT_ID(N'dbo.AiDecisionSource'))
+    CREATE INDEX IX_AiDecisionSource_Decision ON dbo.AiDecisionSource(DecisionId);
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_AiApproval_Status' AND object_id = OBJECT_ID(N'dbo.AiApproval'))
+    CREATE INDEX IX_AiApproval_Status ON dbo.AiApproval(ApprovalStatus, CreatedAt DESC);
 GO
 
 -- ---------- Stored procedures (sp_Module_Action_Entity) ----------
