@@ -1,0 +1,41 @@
+# Helm values for qdrant/qdrant - Phase 0.9 dev. A 3-node distributed Qdrant cluster
+# (the chart wires peer bootstrap over the p2p port). Stores vector embeddings for RAG.
+# Internal only (ClusterIP); API-key protected; out of the Linkerd mesh.
+replicaCount: 3
+
+# Distributed mode: collections use shards + replication across the 3 peers.
+config:
+  cluster:
+    enabled: true
+    p2p:
+      port: 6335
+      enable_tls: false
+  service:
+    enable_tls: false        # dev: plaintext in-cluster. Prod: TLS + mesh.
+
+# API key for all REST/gRPC access, read from the 'qdrant-apikey' Secret (not hardcoded).
+# (/metrics + health endpoints are exempt from the key, so Prometheus needs no creds.)
+apiKey:
+  valueFrom:
+    secretKeyRef:
+      name: qdrant-apikey
+      key: api-key
+
+persistence:
+  size: 5Gi
+  storageClassName: itorchestra-longhorn
+
+resources:
+  requests:
+    cpu: "100m"
+    memory: "256Mi"
+  limits:
+    cpu: "1000m"
+    memory: "1Gi"
+
+# Chart ships its own ServiceMonitor (scrapes /metrics on the 'http' port). Phase 0.8 Prometheus
+# is configured with serviceMonitorSelectorNilUsesHelmValues=false, so it is picked up.
+metrics:
+  serviceMonitor:
+    enabled: true
+    scrapeInterval: 30s

@@ -1,0 +1,50 @@
+# GPU enablement (Phase 0.9). Prereq on the HOST: nvidia-container-toolkit installed so K3s
+# auto-detects the NVIDIA container runtime (K3s then generates the 'nvidia' RuntimeClass).
+# This manifest deploys the NVIDIA k8s device plugin so the node advertises `nvidia.com/gpu`,
+# which the vLLM pod requests.
+#
+# Verify after apply:  kubectl describe node <node> | grep nvidia.com/gpu   (should be >= 1)
+---
+apiVersion: node.k8s.io/v1
+kind: RuntimeClass
+metadata:
+  name: nvidia
+handler: nvidia
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: nvidia-device-plugin-daemonset
+  namespace: kube-system
+  labels:
+    app: nvidia-device-plugin
+spec:
+  selector:
+    matchLabels:
+      app: nvidia-device-plugin
+  updateStrategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: nvidia-device-plugin
+    spec:
+      runtimeClassName: nvidia      # run the plugin itself under the NVIDIA runtime (K3s).
+      priorityClassName: system-node-critical
+      tolerations:
+        - operator: Exists          # schedule on any node, including tainted GPU nodes.
+      containers:
+        - name: nvidia-device-plugin-ctr
+          image: nvcr.io/nvidia/k8s-device-plugin:v0.17.1
+          env:
+            - name: FAIL_ON_INIT_ERROR
+              value: "false"
+          securityContext:
+            privileged: true
+          volumeMounts:
+            - name: device-plugin
+              mountPath: /var/lib/kubelet/device-plugins
+      volumes:
+        - name: device-plugin
+          hostPath:
+            path: /var/lib/kubelet/device-plugins

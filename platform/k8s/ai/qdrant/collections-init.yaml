@@ -1,0 +1,88 @@
+# Creates the 5 RAG collections in Qdrant (Phase 0.9), idempotently. Vectors are sized for
+# the bge-m3 embedding model (1024 dims, Cosine). On the 3-node cluster each collection uses
+# 2 shards with replication_factor=2 (survives one node loss).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: qdrant-collections-init
+  namespace: ai
+  labels:
+    app: qdrant
+data:
+  init.sh: |
+    #!/bin/sh
+    set -eu
+    : "${QDRANT_URL:?}"; : "${QDRANT_API_KEY:?}"
+    VECTOR_SIZE=1024          # bge-m3
+    SHARDS=2
+    REPLICAS=2
+    COLLECTIONS="knowledge_base past_incidents policies scripts device_profiles"
+
+    echo "Waiting for Qdrant at ${QDRANT_URL} ..."
+    i=0
+    until curl -sf -H "api-key: ${QDRANT_API_KEY}" "${QDRANT_URL}/readyz" >/dev/null 2>&1; do
+      i=$((i+1)); [ "$i" -gt 60 ] && { echo "Qdrant not ready"; exit 1; }
+      sleep 5
+    done
+
+    for c in ${COLLECTIONS}; do
+      code=$(curl -s -o /dev/null -w '%{http_code}' -H "api-key: ${QDRANT_API_KEY}" "${QDRANT_URL}/collections/${c}")
+      if [ "${code}" = "200" ]; then
+        echo "  collection '${c}' already exists (skip)"
+        continue
+      fi
+      echo "  creating collection '${c}' (size=${VECTOR_SIZE}, Cosine, shards=${SHARDS}, replicas=${REPLICAS})"
+      curl -sf -X PUT "${QDRANT_URL}/collections/${c}" \
+        -H "api-key: ${QDRANT_API_KEY}" -H "Content-Type: application/json" \
+        -d "{\"vectors\":{\"size\":${VECTOR_SIZE},\"distance\":\"Cosine\"},\"shard_number\":${SHARDS},\"replication_factor\":${REPLICAS}}" \
+        >/dev/null
+      echo "  created '${c}'"
+    done
+    echo "All collections ensured."
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: qdrant-collections-init
+  namespace: ai
+  labels:
+    app: qdrant
+spec:
+  backoffLimit: 6
+  ttlSecondsAfterFinished: 600
+  template:
+    metadata:
+      labels:
+        app: qdrant
+        job: collections-init
+    spec:
+      restartPolicy: OnFailure
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: init
+          image: curlimages/curl:8.11.1
+          command: ["sh", "/scripts/init.sh"]
+          env:
+            - name: QDRANT_URL
+              value: "http://qdrant.ai.svc.cluster.local:6333"
+            - name: QDRANT_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: qdrant-apikey
+                  key: api-key
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: scripts
+              mountPath: /scripts
+      volumes:
+        - name: scripts
+          configMap:
+            name: qdrant-collections-init

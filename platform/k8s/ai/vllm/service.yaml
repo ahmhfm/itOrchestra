@@ -1,0 +1,15 @@
+# Internal Service for vLLM. Consumers use http://vllm.ai.svc.cluster.local:8000/v1/...
+# (OpenAI-compatible). No external exposure.
+apiVersion: v1
+kind: Service
+metadata:
+  name: vllm
+  namespace: ai
+  labels:
+    app: vllm
+spec:
+  type: ClusterIP
+  selector:
+    app: vllm
+  ports:
+    - { name: http, port: 8000, targetPort: 8000, protocol: TCP }

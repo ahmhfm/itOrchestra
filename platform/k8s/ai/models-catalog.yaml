@@ -1,0 +1,55 @@
+# Central AI Models Catalog (Phase 0.9). A single source of truth describing every model the
+# platform may use: its engine, endpoint, purpose, and dimensions. Services read this (mounted
+# or fetched) instead of hardcoding endpoints/model names. Extend as models are added.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ai-models-catalog
+  namespace: ai
+  labels:
+    app: ai
+data:
+  catalog.json: |
+    {
+      "version": "1",
+      "updated": "2026-06-07",
+      "defaults": {
+        "chat": "qwen2.5-1.5b-instruct",
+        "embedding": "bge-m3"
+      },
+      "models": [
+        {
+          "name": "qwen2.5-1.5b-instruct",
+          "family": "Qwen2.5",
+          "version": "1.5B-Instruct",
+          "task": "chat",
+          "engine": "vllm",
+          "runtime": "gpu",
+          "endpoint": "http://vllm.ai.svc.cluster.local:8000/v1",
+          "api": "openai",
+          "auth": "bearer (Vault: secret/itorchestra/shared/ai#vllm-api-key)",
+          "context_length": 8192,
+          "languages": ["ar", "en", "multi"]
+        },
+        {
+          "name": "bge-m3",
+          "family": "BGE-M3",
+          "version": "m3",
+          "task": "embedding",
+          "engine": "ollama",
+          "runtime": "cpu",
+          "endpoint": "http://ollama.ai.svc.cluster.local:11434/api/embed",
+          "api": "ollama",
+          "dimensions": 1024,
+          "distance": "Cosine",
+          "languages": ["ar", "en", "multi"]
+        }
+      ],
+      "vector_store": {
+        "engine": "qdrant",
+        "endpoint": "http://qdrant.ai.svc.cluster.local:6333",
+        "grpc": "qdrant.ai.svc.cluster.local:6334",
+        "auth": "api-key (Vault: secret/itorchestra/shared/ai#qdrant-api-key)",
+        "collections": ["knowledge_base", "past_incidents", "policies", "scripts", "device_profiles"]
+      }
+    }

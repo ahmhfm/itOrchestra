@@ -106,6 +106,20 @@ metadata:
   annotations:
     linkerd.io/inject: enabled
 ---
+# AI layer (Phase 0.9): Qdrant (vector DB) + vLLM (GPU inference) + Ollama (CPU embeddings).
+# Fully internal - no LoadBalancer, no YARP route - so models/data never leave the cluster.
+# Out of the Linkerd mesh in dev (consistent with the other data stores); access is fenced by
+# NetworkPolicies (only the microservice namespaces + Prometheus may reach it).
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ai
+  labels:
+    name: ai
+    pod-security.kubernetes.io/enforce: baseline
+  annotations:
+    linkerd.io/inject: disabled
+---
 # Central Observability stack (Phase 0.8): OpenTelemetry Collector + Tempo + Prometheus +
 # Grafana + AlertManager + OpenSearch. Kept OUT of the Linkerd mesh in dev (consistent with
 # the other data stores): a meshed Prometheus scraping cross-namespace targets and the

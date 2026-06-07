@@ -1,0 +1,111 @@
+# Network fencing for the AI namespace (Phase 0.9). Goal: nothing outside the cluster can
+# reach AI, and AI only talks to what it must. Default-deny both directions, then open:
+#   - DNS egress (CoreDNS)
+#   - HTTPS egress (443) for ONE-TIME model-weight downloads at provisioning (HF / Ollama lib)
+#   - intra-namespace traffic (Qdrant peer clustering 6335/6334)
+#   - ingress from the microservice namespaces on the AI service ports
+#   - ingress from Prometheus (observability) on the metrics ports
+# There is no LoadBalancer and no YARP route, so AI is unreachable from outside the cluster.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: ai
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dns-egress
+  namespace: ai
+spec:
+  podSelector: {}
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: kube-system }
+      ports:
+        - { protocol: UDP, port: 53 }
+        - { protocol: TCP, port: 53 }
+---
+# Egress to the internet on 443 is needed ONLY to pull model weights at provisioning
+# (vLLM -> HuggingFace, Ollama -> registry). Inference never sends data out. Prod pulls from
+# an internal mirror and removes this rule.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-https-egress-for-model-pull
+  namespace: ai
+spec:
+  podSelector: {}
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+      ports:
+        - { protocol: TCP, port: 443 }
+---
+# Qdrant cluster peers + intra-namespace calls (e.g. collections-init Job -> Qdrant).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-intra-namespace
+  namespace: ai
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: ai }
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: ai }
+---
+# Microservices (their namespaces) may call Qdrant / vLLM / Ollama.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-from-services
+  namespace: ai
+spec:
+  podSelector: {}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchExpressions:
+              - key: kubernetes.io/metadata.name
+                operator: In
+                values: [ns-identity, ns-assets, ns-discovery]
+      ports:
+        - { protocol: TCP, port: 6333 }   # Qdrant REST
+        - { protocol: TCP, port: 6334 }   # Qdrant gRPC
+        - { protocol: TCP, port: 8000 }   # vLLM OpenAI API
+        - { protocol: TCP, port: 11434 }  # Ollama embeddings
+---
+# Prometheus scrapes AI metrics.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-from-observability
+  namespace: ai
+spec:
+  podSelector: {}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: observability }
+      ports:
+        - { protocol: TCP, port: 6333 }   # Qdrant /metrics
+        - { protocol: TCP, port: 8000 }   # vLLM /metrics

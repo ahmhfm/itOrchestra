@@ -1,0 +1,97 @@
+# vLLM (Phase 0.9) - local GPU inference, OpenAI-compatible API. Serves the chat LLM
+# (Qwen2.5-1.5B-Instruct) on the node's NVIDIA GPU. Internal only; API-key protected;
+# exposes Prometheus metrics on /metrics. Model weights are pulled once at first start
+# into a Longhorn-backed HF cache (provisioning fetch; inference stays local).
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: vllm-hf-cache
+  namespace: ai
+  labels:
+    app: vllm
+spec:
+  accessModes: ["ReadWriteOnce"]
+  storageClassName: itorchestra-longhorn
+  resources:
+    requests:
+      storage: 20Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vllm
+  namespace: ai
+  labels:
+    app: vllm
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate            # single GPU: never run two pods competing for VRAM.
+  selector:
+    matchLabels:
+      app: vllm
+  template:
+    metadata:
+      labels:
+        app: vllm
+    spec:
+      runtimeClassName: nvidia
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: vllm
+          image: vllm/vllm-openai:latest   # pin to a tag matching the host CUDA driver in prod.
+          imagePullPolicy: IfNotPresent
+          args:
+            - "--model=Qwen/Qwen2.5-1.5B-Instruct"
+            - "--served-model-name=qwen2.5-1.5b-instruct"
+            - "--gpu-memory-utilization=0.85"
+            - "--max-model-len=8192"
+            - "--host=0.0.0.0"
+            - "--port=8000"
+          ports:
+            - { name: http, containerPort: 8000 }
+          env:
+            - name: HF_HOME
+              value: /data/hf
+            - name: HUGGINGFACE_HUB_CACHE
+              value: /data/hf
+            # OpenAI-compatible API key (clients send: Authorization: Bearer <key>).
+            - name: VLLM_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: vllm-apikey
+                  key: api-key
+          startupProbe:
+            httpGet: { path: /health, port: 8000 }
+            periodSeconds: 15
+            failureThreshold: 80      # up to ~20 min for the first model download + load.
+          readinessProbe:
+            httpGet: { path: /health, port: 8000 }
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /health, port: 8000 }
+            initialDelaySeconds: 60
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "3Gi"
+            limits:
+              cpu: "4"
+              memory: "8Gi"
+              nvidia.com/gpu: "1"
+          securityContext:
+            allowPrivilegeEscalation: false
+          volumeMounts:
+            - { name: hf-cache, mountPath: /data }
+            - { name: dshm,     mountPath: /dev/shm }
+      volumes:
+        - name: hf-cache
+          persistentVolumeClaim:
+            claimName: vllm-hf-cache
+        - name: dshm
+          emptyDir:
+            medium: Memory
+            sizeLimit: 2Gi
