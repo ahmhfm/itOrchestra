@@ -58,6 +58,21 @@ metadata:
   annotations:
     linkerd.io/inject: enabled
 ---
+# CrewAI multi-agent orchestration service (Phase 0.10). A real microservice consumed over gRPC
+# by other services, so it is meshed (Linkerd) and runs under the 'restricted' profile. It calls
+# the AI layer (Ollama/Qdrant in 'ai') and its own audit DB (CrewAiDb on the 0.7 AG in 'mssql').
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ns-crewai
+  labels:
+    name: ns-crewai
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+  annotations:
+    linkerd.io/inject: enabled
+---
 # ---------- Shared infrastructure namespaces (filled in by later 0.x steps) ----------
 apiVersion: v1
 kind: Namespace

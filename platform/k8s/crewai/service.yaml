@@ -1,0 +1,18 @@
+# Internal ClusterIP for the CrewAI gRPC API. Port named 'grpc' so Linkerd treats it as HTTP/2.
+# Reached only in-cluster over Linkerd mTLS by other itOrchestra services; never exposed.
+apiVersion: v1
+kind: Service
+metadata:
+  name: crewai
+  namespace: ns-crewai
+  labels:
+    app: crewai
+spec:
+  type: ClusterIP
+  selector:
+    app: crewai
+  ports:
+    - name: grpc
+      port: 50051
+      targetPort: 50051
+      protocol: TCP

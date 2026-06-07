@@ -1,0 +1,58 @@
+# CrewAI orchestration service (Phase 0.10, dev). Meshed (Linkerd) gRPC microservice in the
+# 'restricted' PSA. Config/secret are created by install-dev.sh from Vault + the 0.9 AI layer.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: crewai
+  namespace: ns-crewai
+  labels:
+    app: crewai
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: crewai
+  template:
+    metadata:
+      labels:
+        app: crewai
+      annotations:
+        linkerd.io/inject: enabled
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: crewai
+          image: itorchestra/crewai:dev
+          imagePullPolicy: IfNotPresent
+          ports:
+            - { name: grpc, containerPort: 50051 }
+          envFrom:
+            - configMapRef: { name: crewai-config }
+            - secretRef: { name: crewai-secrets }
+          readinessProbe:
+            grpc: { port: 50051 }
+            initialDelaySeconds: 40
+            periodSeconds: 15
+            failureThreshold: 6
+          livenessProbe:
+            grpc: { port: 50051 }
+            initialDelaySeconds: 60
+            periodSeconds: 20
+            failureThreshold: 6
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "384Mi"
+            limits:
+              cpu: "1"
+              memory: "1Gi"
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            capabilities:
+              drop: ["ALL"]

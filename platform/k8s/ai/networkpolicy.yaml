@@ -86,7 +86,7 @@ spec:
             matchExpressions:
               - key: kubernetes.io/metadata.name
                 operator: In
-                values: [ns-identity, ns-assets, ns-discovery]
+                values: [ns-identity, ns-assets, ns-discovery, ns-crewai]
       ports:
         - { protocol: TCP, port: 6333 }   # Qdrant REST
         - { protocol: TCP, port: 6334 }   # Qdrant gRPC

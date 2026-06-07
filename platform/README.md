@@ -18,7 +18,8 @@ It is built incrementally, one step at a time, following the project plan
 | 0.6 | Redis (Cache + Streams) - single-node StatefulSet, AOF on Longhorn, AUTH, out of mesh; password mirrored to Vault | Done (dev) - verify-0.6 8/8 |
 | 0.7 | SQL Server Always On AG - reference 2-replica clusterless (read-scale) AG, cert-auth endpoints, auto-seeding; SA mirrored to Vault | Done (dev) - verify-0.7 8/8 |
 | 0.8 | Observability - OpenTelemetry Collector + Tempo + Prometheus + Grafana + AlertManager + OpenSearch; Grafana via YARP; creds mirrored to Vault | Done (dev) - verify-0.8 13/13 |
-| 0.9 | AI layer - Qdrant 3-node cluster (5 RAG collections) + Ollama (CPU) serving chat `qwen2.5:1.5b` + embeddings `bge-m3` (no GPU on this VM; vLLM/GPU is the prod path); internal-only, NetworkPolicy-fenced; Qdrant metrics to Prometheus; endpoints/key mirrored to Vault | Done (dev) - verify-0.9 |
+| 0.9 | AI layer - Qdrant 3-node cluster (5 RAG collections) + Ollama (CPU) serving chat `qwen2.5:1.5b` + embeddings `bge-m3` (no GPU on this VM; vLLM/GPU is the prod path); internal-only, NetworkPolicy-fenced; Qdrant metrics to Prometheus; endpoints/key mirrored to Vault | Done (dev) - verify-0.9 11/11 |
+| 0.10 | CrewAI multi-agent orchestration - Python gRPC service (`itorchestra.crewai.v1`), 7 agents (Orchestrator/Security/Performance/Patch/PowerShell/Policy/Compliance) with roles/tasks/tools, Ollama LLM + Qdrant RAG backends, per-agent permissions matrix (auto vs. approval), full audit trail in `CrewAiDb` (0.7 AG, stored-procedures only), meshed + internal-only | Done (dev) - verify-0.10 |
 | ... | ... | ... |
 
 ## Two deployment profiles
@@ -250,6 +251,47 @@ Layout: `k8s/ai/` (`qdrant/{values.yaml,collections-init.yaml}`,
 `networkpolicy.yaml`, `install-dev.sh`; plus the prod/GPU path `vllm/{deployment,service}.yaml` +
 `gpu/nvidia-device-plugin.yaml`), `bootstrap/08-ai-dev.sh`, `bootstrap/verify-0.9.sh`,
 [`docs/runbook-0.9.md`](docs/runbook-0.9.md).
+
+## Step 0.10 - CrewAI multi-agent orchestration
+
+The first real **application service**: a **Python gRPC** service (CrewAI is Python-only) that
+orchestrates seven agents - **Orchestrator, Security, Performance, Patch, PowerShell, Policy,
+Compliance** - each with a role, goal, tools and a slice of a **permissions matrix**. The
+Orchestrator routes a task to the right specialist; the agent grounds its reasoning via **Qdrant
+RAG** and the local **Ollama** LLM (0.9), then the matrix decides the outcome: **AUTO** actions
+are advisory (read-only), **APPROVAL** actions are parked as `PENDING_APPROVAL` until an explicit
+`ApproveAction`, and **DENY** actions are rejected. Action tools are **safe stubs** in dev (the
+owning services - assets/discovery/etc. - don't exist yet), so nothing real is ever changed.
+
+Every decision is written to a **full audit trail** in a per-service database **`CrewAiDb`** on
+the 0.7 AG, accessed **exclusively through stored procedures** (the `crewai_app` login is granted
+`EXEC` only - no table access - enforcing the SP-only rule even from Python). The service is
+**meshed** (Linkerd mTLS) and **internal-only** (ClusterIP, NetworkPolicy-fenced, no YARP route);
+other itOrchestra services consume it over gRPC (`itorchestra.crewai.v1`).
+
+```bash
+cd ~/itOrchestra/platform
+bash bootstrap/09-crewai-dev.sh
+```
+
+The installer builds + imports the image, provisions `CrewAiDb` (+ login + stored procedures) on
+the AG primary, writes config/secrets (Ollama/Qdrant endpoints, Qdrant key, DB creds), deploys
+the meshed Deployment/Service/NetworkPolicies, and mirrors the gRPC endpoint into **Vault KV**
+(`secret/itorchestra/shared/crewai`). Verification exercises the full flow in-pod (Health,
+ListAgents=7, approval-gated SubmitTask -> ApproveAction -> EXECUTED, audit read-back, RAG Query).
+
+> **dev vs prod:** dev defers **JWT** (internal + NetworkPolicy only) and runs CrewAI on the **CPU**
+> LLM (slow first call); `CrewAiDb` shares the 0.7 AG **instance** with a dedicated database +
+> least-privilege login. Prod validates **Keycloak JWT** on every gRPC call, propagates the
+> correlation-id end to end, gives CrewAI its **own** private DB instance, points the LLM backend
+> at **vLLM/GPU**, replaces the action stubs with **gRPC calls to the owning services**, and pins
+> the image. Resilience follows the "Polly on top of Linkerd" rule.
+
+Layout: `crewai/` (the Python service: `app/{config,db,permissions,agents,tools,crew,service,
+main}.py`, `proto/crewai.proto`, `requirements.txt`, `Dockerfile`, `build-and-import-dev.sh`),
+`k8s/crewai/` (`db/{01-database-and-login,02-schema}.sql`, `deployment.yaml`, `service.yaml`,
+`networkpolicy.yaml`, `scripts/grpc_smoke.py`, `install-dev.sh`), `bootstrap/09-crewai-dev.sh`,
+`bootstrap/verify-0.10.sh`, [`docs/runbook-0.10.md`](docs/runbook-0.10.md).
 
 ## Conventions (from the project rules)
 

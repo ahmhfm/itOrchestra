@@ -1,0 +1,117 @@
+# Network fencing for ns-crewai (Phase 0.10). Self-contained (ns-crewai did not exist at mesh
+# bootstrap). Default-deny both ways, then open only what a meshed service needs:
+#   - DNS egress (CoreDNS)
+#   - Linkerd control-plane egress + linkerd-viz proxy-metrics scrape (so the sidecar gets mTLS)
+#   - egress to the AI layer (Qdrant 6333/6334, Ollama 11434) and to the audit DB (mssql 1433)
+#   - gRPC ingress (50051) only from the consuming microservice namespaces + intra-namespace
+# There is no LoadBalancer/NodePort and no YARP route, so CrewAI is unreachable from outside.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: ns-crewai
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dns-egress
+  namespace: ns-crewai
+spec:
+  podSelector: {}
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: kube-system }
+      ports:
+        - { protocol: UDP, port: 53 }
+        - { protocol: TCP, port: 53 }
+---
+# Sidecar must reach the Linkerd control plane (identity/destination/policy) or it never gets
+# its mTLS identity and the pod never becomes Ready.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-linkerd-egress
+  namespace: ns-crewai
+spec:
+  podSelector: {}
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: linkerd }
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-linkerd-viz-scrape
+  namespace: ns-crewai
+spec:
+  podSelector: {}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: linkerd-viz }
+      ports:
+        - { protocol: TCP, port: 4191 }
+---
+# Egress to the AI layer (Qdrant + Ollama). The 'ai' namespace separately allows ingress from
+# ns-crewai on these ports (k8s/ai/networkpolicy.yaml).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-to-ai
+  namespace: ns-crewai
+spec:
+  podSelector: {}
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: ai }
+      ports:
+        - { protocol: TCP, port: 6333 }   # Qdrant REST
+        - { protocol: TCP, port: 6334 }   # Qdrant gRPC
+        - { protocol: TCP, port: 11434 }  # Ollama (chat + embeddings)
+---
+# Egress to the audit database (CrewAiDb on the 0.7 AG).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-to-mssql
+  namespace: ns-crewai
+spec:
+  podSelector: {}
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: mssql }
+      ports:
+        - { protocol: TCP, port: 1433 }
+---
+# Other itOrchestra microservices consume the CrewAI gRPC API (50051) over Linkerd mTLS.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-grpc-ingress-from-services
+  namespace: ns-crewai
+spec:
+  podSelector:
+    matchLabels:
+      app: crewai
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchExpressions:
+              - key: kubernetes.io/metadata.name
+                operator: In
+                values: [ns-identity, ns-assets, ns-discovery, ns-crewai]
+      ports:
+        - { protocol: TCP, port: 50051 }

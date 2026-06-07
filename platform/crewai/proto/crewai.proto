@@ -1,0 +1,156 @@
+// itOrchestra - CrewAI multi-agent orchestration service (Phase 0.10).
+// Single source of truth for the internal gRPC contract consumed by other itOrchestra services
+// over Linkerd mTLS. Backward-compatible evolution only: never renumber or remove fields.
+syntax = "proto3";
+
+package itorchestra.crewai.v1;
+
+option csharp_namespace = "ItOrchestra.CrewAI.V1";
+
+// Multi-agent orchestration: route a task to the right agent (or let the Orchestrator decide),
+// run RAG-grounded reasoning on the local LLM, enforce a per-agent permissions matrix
+// (auto-execute vs. requires-approval), and persist a full audit trail of every decision.
+service CrewOrchestrator {
+  // Submit a task. The Orchestrator routes it to an agent (or 'agent' pins one). The response
+  // carries the decision, its audit id, and a status (EXECUTED / PENDING_APPROVAL / REJECTED).
+  rpc SubmitTask(SubmitTaskRequest) returns (TaskDecision);
+
+  // RAG-grounded question answering against a Qdrant collection (read-only; never mutating).
+  rpc Query(QueryRequest) returns (QueryResponse);
+
+  // Approval workflow for actions the permissions matrix marks as requires-approval.
+  rpc ListPendingApprovals(ListPendingApprovalsRequest) returns (PendingApprovals);
+  rpc ApproveAction(ApprovalDecisionRequest) returns (TaskDecision);
+  rpc RejectAction(ApprovalDecisionRequest) returns (TaskDecision);
+
+  // Fetch a previously recorded decision (audit record) by id.
+  rpc GetDecision(GetDecisionRequest) returns (TaskDecision);
+
+  // Introspection: the catalog of agent profiles and their permissions.
+  rpc ListAgents(ListAgentsRequest) returns (AgentCatalog);
+
+  // Liveness/readiness for callers and probes.
+  rpc Health(HealthRequest) returns (HealthResponse);
+}
+
+enum AgentKind {
+  AGENT_KIND_UNSPECIFIED = 0;
+  ORCHESTRATOR = 1;
+  SECURITY = 2;
+  PERFORMANCE = 3;
+  PATCH = 4;
+  POWERSHELL = 5;
+  POLICY = 6;
+  COMPLIANCE = 7;
+}
+
+// Outcome of a submitted task / action.
+enum DecisionStatus {
+  DECISION_STATUS_UNSPECIFIED = 0;
+  EXECUTED = 1;          // auto-allowed action ran (dev: stub) and was audited
+  PENDING_APPROVAL = 2;  // requires-approval; parked awaiting ApproveAction/RejectAction
+  REJECTED = 3;          // rejected by policy or by an approver
+  ADVISORY = 4;          // read-only/recommendation only; nothing was changed
+  FAILED = 5;            // an error occurred while handling the task
+}
+
+message SubmitTaskRequest {
+  // Optional: pin a specific agent. If UNSPECIFIED, the Orchestrator routes by intent.
+  AgentKind agent = 1;
+  // The natural-language task / request.
+  string prompt = 2;
+  // The action the task would perform (used against the permissions matrix), e.g.
+  // "read.kb", "scan.vuln", "patch.apply", "powershell.run", "policy.evaluate".
+  string action = 3;
+  // Optional target identifier (asset id, host, etc.) - opaque to this service.
+  string target = 4;
+  // Optional RAG collection to ground the reasoning (e.g. "knowledge_base").
+  string collection = 5;
+  // Idempotency key for safe retries of sensitive submissions.
+  string idempotency_key = 6;
+  // Caller principal (service account / user) for the audit trail.
+  string requested_by = 7;
+}
+
+message TaskDecision {
+  string decision_id = 1;        // audit id (GUID)
+  AgentKind agent = 2;
+  DecisionStatus status = 3;
+  string action = 4;
+  string target = 5;
+  bool requires_approval = 6;
+  string rationale = 7;          // the agent's reasoning / recommendation text
+  repeated SourceRef sources = 8; // RAG citations used to ground the decision
+  string requested_by = 9;
+  string created_at = 10;        // RFC3339
+  string correlation_id = 11;
+}
+
+message SourceRef {
+  string collection = 1;
+  string point_id = 2;
+  double score = 3;
+  string snippet = 4;
+}
+
+message QueryRequest {
+  string question = 1;
+  string collection = 2;   // defaults to "knowledge_base"
+  uint32 top_k = 3;        // defaults to 5
+}
+
+message QueryResponse {
+  string answer = 1;
+  repeated SourceRef sources = 2;
+  string correlation_id = 3;
+}
+
+message ListPendingApprovalsRequest {
+  AgentKind agent = 1;     // optional filter
+  uint32 limit = 2;        // defaults to 50
+}
+
+message PendingApprovals {
+  repeated TaskDecision items = 1;
+}
+
+message ApprovalDecisionRequest {
+  string decision_id = 1;
+  string approver = 2;     // principal approving/rejecting
+  string reason = 3;
+}
+
+message GetDecisionRequest {
+  string decision_id = 1;
+}
+
+message ListAgentsRequest {}
+
+message AgentProfile {
+  AgentKind kind = 1;
+  string name = 2;
+  string role = 3;
+  string goal = 4;
+  repeated string tools = 5;
+  repeated PermissionEntry permissions = 6;
+}
+
+message PermissionEntry {
+  string action = 1;
+  bool auto_allowed = 2;   // true => auto-execute; false => requires approval (or denied)
+  bool denied = 3;         // true => never allowed
+}
+
+message AgentCatalog {
+  repeated AgentProfile agents = 1;
+}
+
+message HealthRequest {}
+
+message HealthResponse {
+  bool ok = 1;
+  bool llm_ok = 2;         // Ollama/vLLM reachable
+  bool vector_ok = 3;      // Qdrant reachable
+  bool audit_ok = 4;       // CrewAiDb reachable
+  string version = 5;
+}
