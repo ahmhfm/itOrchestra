@@ -27,8 +27,8 @@ class Config:
     # Ollama-native embedding endpoint (separate from the OpenAI-compatible chat surface).
     ollama_base_url: str = os.getenv("OLLAMA_BASE_URL", "http://ollama.ai.svc.cluster.local:11434")
     embed_model: str = os.getenv("EMBED_MODEL", "bge-m3")
-    llm_timeout_s: int = int(os.getenv("LLM_TIMEOUT_S", "240"))
-    max_tokens: int = int(os.getenv("MAX_TOKENS", "256"))
+    llm_timeout_s: int = int(os.getenv("LLM_TIMEOUT_S", "120"))
+    max_tokens: int = int(os.getenv("MAX_TOKENS", "128"))
     # Dev/CPU default: a single direct LLM call (fast). CrewAI's multi-step crew loop is far
     # slower on CPU; enable it (USE_CREWAI=true) on the prod/GPU profile where it is practical.
     use_crewai: bool = _b("USE_CREWAI", False)

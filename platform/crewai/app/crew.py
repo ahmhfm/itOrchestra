@@ -64,9 +64,21 @@ def _crewai(profile: AgentProfile, prompt: str, context: str) -> str:
 
 
 def reason(profile: AgentProfile, prompt: str, context: str) -> str:
-    if CONFIG.use_crewai:
-        try:
-            return _crewai(profile, prompt, context)
-        except Exception as exc:  # noqa: BLE001 - degrade gracefully to direct LLM
-            log.warning("CrewAI path failed (%s); falling back to direct LLM", exc)
-    return _direct(profile, prompt, context)
+    """Produce a rationale. NEVER raises: a slow/unreachable LLM degrades to a safe fallback
+    so the gRPC call (and the permission decision + audit record) always completes. On the
+    dev/CPU profile the local model can exceed the timeout; that is expected and tolerated."""
+    try:
+        if CONFIG.use_crewai:
+            try:
+                return _crewai(profile, prompt, context)
+            except Exception as exc:  # noqa: BLE001 - degrade to direct LLM
+                log.warning("CrewAI path failed (%s); falling back to direct LLM", exc)
+        return _direct(profile, prompt, context)
+    except Exception as exc:  # noqa: BLE001 - LLM unavailable/slow -> safe fallback
+        log.warning("LLM reasoning unavailable (%s); returning a safe fallback rationale", exc)
+        grounded = "with RAG grounding" if context.strip() else "without grounding (collection empty)"
+        return (
+            f"[advisory pending] The {profile.name} agent could not obtain an LLM response in time "
+            f"({grounded}). The permission decision and audit record were still applied. Retry for a "
+            f"full rationale, or run the GPU/vLLM profile where generation is fast."
+        )

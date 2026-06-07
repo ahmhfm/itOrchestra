@@ -65,8 +65,8 @@ kubectl -n "${NS}" create configmap crewai-config \
   --from-literal=OLLAMA_BASE_URL="http://ollama.${AI_NS}.svc.cluster.local:11434" \
   --from-literal=CHAT_MODEL="qwen2.5:1.5b" \
   --from-literal=EMBED_MODEL="bge-m3" \
-  --from-literal=LLM_TIMEOUT_S="240" \
-  --from-literal=MAX_TOKENS="256" \
+  --from-literal=LLM_TIMEOUT_S="120" \
+  --from-literal=MAX_TOKENS="128" \
   --from-literal=USE_CREWAI="false" \
   --from-literal=CREWAI_TELEMETRY_OPT_OUT="true" \
   --from-literal=OTEL_SDK_DISABLED="true" \
