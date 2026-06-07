@@ -1,0 +1,93 @@
+# OpenSearch (dev): single-node log/search store for the observability stack (Phase 0.8).
+# The OpenTelemetry Collector ships logs here; Grafana reads them via the OpenSearch datasource.
+#
+# DEV ONLY: the security plugin is DISABLED (plaintext HTTP on 9200, no auth) to avoid the
+# demo-cert/TLS bootstrap. OpenSearch stays internal (ClusterIP, out of the mesh). PROD enables
+# the security plugin with TLS + Keycloak-backed roles and meshes the namespace.
+#
+# Node prerequisite: vm.max_map_count >= 262144 (set by install-dev.sh on the VM).
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: opensearch
+  namespace: observability
+  labels:
+    app: opensearch
+spec:
+  serviceName: opensearch
+  replicas: 1
+  selector:
+    matchLabels:
+      app: opensearch
+  template:
+    metadata:
+      labels:
+        app: opensearch
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000           # let the non-root opensearch user write to the Longhorn PVC.
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: opensearch
+          image: opensearchproject/opensearch:2.19.1
+          imagePullPolicy: IfNotPresent
+          ports:
+            - { name: http,    containerPort: 9200 }
+            - { name: transport, containerPort: 9300 }
+            - { name: metrics, containerPort: 9600 }
+          env:
+            - name: cluster.name
+              value: "itorchestra-logs"
+            - name: node.name
+              value: "opensearch-0"
+            - name: discovery.type
+              value: "single-node"
+            - name: bootstrap.memory_lock
+              value: "false"
+            - name: DISABLE_INSTALL_DEMO_CONFIG
+              value: "true"
+            - name: DISABLE_SECURITY_PLUGIN
+              value: "true"
+            # Half the memory limit, capped, per OpenSearch heap guidance.
+            - name: OPENSEARCH_JAVA_OPTS
+              value: "-Xms512m -Xmx512m"
+          readinessProbe:
+            httpGet:
+              path: /_cluster/health
+              port: 9200
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 30
+          livenessProbe:
+            httpGet:
+              path: /_cluster/health
+              port: 9200
+            initialDelaySeconds: 90
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "1Gi"
+            limits:
+              cpu: "1000m"
+              memory: "1536Mi"
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: data
+              mountPath: /usr/share/opensearch/data
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: itorchestra-longhorn
+        resources:
+          requests:
+            storage: 5Gi

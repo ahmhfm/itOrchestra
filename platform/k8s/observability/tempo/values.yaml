@@ -1,0 +1,35 @@
+# Helm values for grafana/tempo (single-binary distribution) - Phase 0.8 dev.
+# Tempo stores traces (local filesystem backend on a Longhorn PVC). The OTel Collector
+# pushes spans via OTLP gRPC (4317); Grafana queries the Tempo HTTP API (3100).
+fullnameOverride: tempo
+
+tempo:
+  # Receive OTLP from the central Collector (the only span producer in dev).
+  receivers:
+    otlp:
+      protocols:
+        grpc:
+          endpoint: 0.0.0.0:4317
+        http:
+          endpoint: 0.0.0.0:4318
+  # Short retention for dev; block flush kept small to bound memory.
+  retention: 24h
+  resources:
+    requests:
+      cpu: "50m"
+      memory: "128Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+
+# Local block storage on Longhorn so traces survive pod restarts.
+persistence:
+  enabled: true
+  storageClassName: itorchestra-longhorn
+  accessModes:
+    - ReadWriteOnce
+  size: 5Gi
+
+# Out of the mesh: no Linkerd sidecar / ServiceMonitor wiring needed in dev.
+serviceMonitor:
+  enabled: false

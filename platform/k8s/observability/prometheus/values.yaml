@@ -1,0 +1,135 @@
+# Helm values for prometheus-community/kube-prometheus-stack - Phase 0.8 dev.
+# Bundles Prometheus (metrics) + Grafana (dashboards) + AlertManager (alerts) +
+# node-exporter + kube-state-metrics + the Prometheus Operator. Release name: kps
+# (so services are kps-prometheus / kps-grafana / kps-alertmanager).
+fullnameOverride: kps
+
+# ----------------------------------------------------------------------------
+# Grafana: the single pane of glass. Served under /grafana behind YARP (sub-path),
+# with Tempo (traces) + OpenSearch (logs) datasources alongside the default Prometheus.
+# ----------------------------------------------------------------------------
+grafana:
+  enabled: true
+  # Admin credentials come from a pre-created Secret (install-dev.sh), mirrored to Vault.
+  admin:
+    existingSecret: grafana-admin
+    userKey: admin-user
+    passwordKey: admin-password
+  # OpenSearch datasource is a plugin (installed at startup; needs egress to grafana.com once).
+  plugins:
+    - grafana-opensearch-datasource
+  grafana.ini:
+    server:
+      # Behind YARP at https://<gateway>/grafana/ - serve assets under the sub-path.
+      root_url: "%(protocol)s://%(domain)s/grafana/"
+      serve_from_sub_path: true
+    # Dev: Grafana's own login. PROD: wire Keycloak OIDC (generic_oauth) here.
+    users:
+      allow_sign_up: false
+  service:
+    type: ClusterIP
+    port: 80
+  resources:
+    requests:
+      cpu: "50m"
+      memory: "128Mi"
+    limits:
+      cpu: "300m"
+      memory: "320Mi"
+  additionalDataSources:
+    - name: Tempo
+      uid: tempo
+      type: tempo
+      access: proxy
+      url: http://tempo.observability.svc.cluster.local:3100
+      jsonData:
+        # Jump from a trace to its logs in OpenSearch by correlation id.
+        tracesToLogsV2:
+          datasourceUid: opensearch
+          filterByTraceID: true
+    - name: OpenSearch
+      uid: opensearch
+      type: grafana-opensearch-datasource
+      access: proxy
+      url: http://opensearch.observability.svc.cluster.local:9200
+      jsonData:
+        flavor: OpenSearch
+        version: "2.19.1"
+        database: "otel-logs"
+        timeField: "@timestamp"
+        pplEnabled: true
+
+# ----------------------------------------------------------------------------
+# AlertManager: routes SLO alerts. Dev uses ephemeral storage + the default receiver.
+# ----------------------------------------------------------------------------
+alertmanager:
+  enabled: true
+  alertmanagerSpec:
+    resources:
+      requests:
+        cpu: "25m"
+        memory: "64Mi"
+      limits:
+        cpu: "100m"
+        memory: "128Mi"
+
+# ----------------------------------------------------------------------------
+# Prometheus: scrapes cluster + Linkerd proxies + the OTel Collector's exported metrics.
+# Short retention on a small Longhorn PVC for dev.
+# ----------------------------------------------------------------------------
+prometheus:
+  prometheusSpec:
+    retention: 3d
+    scrapeInterval: 30s
+    # Pick up ServiceMonitors/PrometheusRules regardless of the 'release' label.
+    serviceMonitorSelectorNilUsesHelmValues: false
+    ruleSelectorNilUsesHelmValues: false
+    podMonitorSelectorNilUsesHelmValues: false
+    resources:
+      requests:
+        cpu: "100m"
+        memory: "512Mi"
+      limits:
+        cpu: "750m"
+        memory: "1Gi"
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: itorchestra-longhorn
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 5Gi
+    # Application telemetry + Linkerd golden metrics flow through these extra jobs.
+    additionalScrapeConfigs:
+      # The OTel Collector re-exports OTLP metrics in Prometheus format on :8889.
+      - job_name: otel-collector
+        static_configs:
+          - targets: ["otel-collector.observability.svc.cluster.local:8889"]
+      # Linkerd data-plane proxies expose /metrics on the admin port (4191).
+      - job_name: linkerd-proxy
+        kubernetes_sd_configs:
+          - role: pod
+        relabel_configs:
+          - source_labels:
+              - __meta_kubernetes_pod_container_name
+              - __meta_kubernetes_pod_container_port_name
+            action: keep
+            regex: ^linkerd-proxy;linkerd-admin$
+          - source_labels: [__meta_kubernetes_namespace]
+            action: replace
+            target_label: namespace
+          - source_labels: [__meta_kubernetes_pod_name]
+            action: replace
+            target_label: pod
+
+prometheusOperator:
+  resources:
+    requests:
+      cpu: "50m"
+      memory: "128Mi"
+    limits:
+      cpu: "200m"
+      memory: "256Mi"
+
+# node-exporter + kube-state-metrics stay enabled (chart defaults) for host + object metrics.

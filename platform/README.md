@@ -17,6 +17,7 @@ It is built incrementally, one step at a time, following the project plan
 | 0.5 | HashiCorp Vault (Raft + Longhorn) + Agent Injector; KV v2 + Kubernetes auth; 0.4 secrets seeded | Done (dev) - verify-0.5 8/8 |
 | 0.6 | Redis (Cache + Streams) - single-node StatefulSet, AOF on Longhorn, AUTH, out of mesh; password mirrored to Vault | Done (dev) - verify-0.6 8/8 |
 | 0.7 | SQL Server Always On AG - reference 2-replica clusterless (read-scale) AG, cert-auth endpoints, auto-seeding; SA mirrored to Vault | Done (dev) - verify-0.7 8/8 |
+| 0.8 | Observability - OpenTelemetry Collector + Tempo + Prometheus + Grafana + AlertManager + OpenSearch; Grafana via YARP; creds mirrored to Vault | Done (dev) - verify-0.8 |
 | ... | ... | ... |
 
 ## Two deployment profiles
@@ -174,6 +175,43 @@ Vault-sourced connection string. Entry points: `mssql-ag-primary` (read-write) a
 Layout: `k8s/mssql-ag/` (`mssql-conf-configmap.yaml`, `service.yaml`, `statefulset.yaml`,
 `install-dev.sh`), `bootstrap/06-mssql-ag-dev.sh`, `bootstrap/verify-0.7.sh`,
 [`docs/runbook-0.7.md`](docs/runbook-0.7.md).
+
+## Step 0.8 - Observability (OpenTelemetry + Tempo + Prometheus + Grafana + OpenSearch)
+
+Stack: the central monitoring system. The **OpenTelemetry Collector** (contrib) is the single
+OTLP ingest point; it fans telemetry out to **Tempo** (traces), **Prometheus** (metrics), and
+**OpenSearch** (logs), all visualized in **Grafana** with **AlertManager** for SLO alerts.
+Prometheus also scrapes the **Linkerd** data-plane proxies (golden metrics) and the cluster
+(node-exporter + kube-state-metrics). Everything lives in the `observability` namespace, **out
+of the Linkerd mesh** in dev (consistent with the other data stores). Grafana is the only piece
+exposed to operators, and only **through YARP** at `/grafana`.
+
+```bash
+cd ~/itOrchestra/platform
+bash bootstrap/07-observability-dev.sh
+```
+
+The installer deploys OpenSearch (single-node, security plugin disabled in dev), Tempo and the
+kube-prometheus-stack via Helm, applies sample **SLO** alert rules, deploys the Collector
+(tail sampling keeps all error/slow traces; sensitive headers are scrubbed before export),
+opens gateway egress to Grafana, **rebuilds the gateway image** with the `/grafana` route, and
+mirrors the Grafana admin creds + stack endpoints into **Vault KV**
+(`secret/itorchestra/shared/observability`). Services emit telemetry to
+`otel-collector.observability.svc.cluster.local:4317` (gRPC) / `:4318` (HTTP); the
+`X-Correlation-Id` / `traceparent` flow is wired at YARP and propagated through gRPC + Streams +
+Hangfire. See [`ai/skills/opentelemetry.md`](../ai/skills/opentelemetry.md).
+
+> **dev vs prod:** dev runs single replicas with short retention on Longhorn PVCs, OpenSearch
+> with its **security plugin disabled** (plaintext, internal only), and Grafana's own admin
+> login. Prod meshes the namespace for **mTLS on the OTLP path**, enables the OpenSearch
+> security plugin with **TLS + Keycloak** roles, fronts Grafana with **Keycloak OIDC**, pins
+> chart versions, scales retention/storage, and wires AlertManager receivers (email/Slack/PagerDuty).
+> The bundled `linkerd-viz` Prometheus (0.2) is now superseded by this central Prometheus.
+
+Layout: `k8s/observability/` (`opensearch/`, `tempo/values.yaml`,
+`prometheus/{values.yaml,slo-alerts.yaml}`, `otel-collector/values.yaml`, `gateway-egress.yaml`,
+`install-dev.sh`), `bootstrap/07-observability-dev.sh`, `bootstrap/verify-0.8.sh`,
+[`docs/runbook-0.8.md`](docs/runbook-0.8.md).
 
 ## Conventions (from the project rules)
 

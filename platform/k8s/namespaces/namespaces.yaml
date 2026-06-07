@@ -106,6 +106,11 @@ metadata:
   annotations:
     linkerd.io/inject: enabled
 ---
+# Central Observability stack (Phase 0.8): OpenTelemetry Collector + Tempo + Prometheus +
+# Grafana + AlertManager + OpenSearch. Kept OUT of the Linkerd mesh in dev (consistent with
+# the other data stores): a meshed Prometheus scraping cross-namespace targets and the
+# server-speaks-first stores (OpenSearch/Tempo) add opaque-port complexity. Apps still emit
+# OTLP to the Collector in-cluster. Prod meshes this namespace for mTLS on the OTLP path.
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -114,4 +119,4 @@ metadata:
     name: observability
     pod-security.kubernetes.io/enforce: baseline
   annotations:
-    linkerd.io/inject: enabled
+    linkerd.io/inject: disabled

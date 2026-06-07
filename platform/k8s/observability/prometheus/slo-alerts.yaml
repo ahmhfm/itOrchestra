@@ -1,0 +1,52 @@
+# Sample SLO alert rules (Phase 0.8). The Prometheus Operator picks these up
+# (ruleSelectorNilUsesHelmValues=false). These are reference SLOs; real service-level
+# thresholds are added as each microservice is onboarded. With no app traffic yet, the
+# request-error rule simply has no data and never fires.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: itorchestra-slo
+  namespace: observability
+  labels:
+    app: itorchestra-observability
+    role: alert-rules
+spec:
+  groups:
+    - name: itorchestra.platform
+      rules:
+        # Any scrape target down for 5m (covers data stores, gateway, collector, exporters).
+        - alert: TargetDown
+          expr: up == 0
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Scrape target down: {{ $labels.job }} ({{ $labels.namespace }}/{{ $labels.pod }})"
+            description: "Prometheus has not been able to scrape {{ $labels.job }} for 5 minutes."
+
+    - name: itorchestra.slo
+      rules:
+        # Reference availability SLO: HTTP 5xx ratio over 5% for 10m (OTel http.server metrics).
+        - alert: HighRequestErrorRate
+          expr: |
+            sum(rate(http_server_request_duration_seconds_count{http_response_status_code=~"5.."}[5m]))
+              /
+            sum(rate(http_server_request_duration_seconds_count[5m])) > 0.05
+          for: 10m
+          labels:
+            severity: critical
+          annotations:
+            summary: "High 5xx error ratio (> 5%) across services"
+            description: "The platform-wide HTTP 5xx ratio has exceeded the 5% SLO for 10 minutes."
+
+        # Reference latency SLO: p95 request duration above 1s for 10m.
+        - alert: HighRequestLatencyP95
+          expr: |
+            histogram_quantile(0.95,
+              sum(rate(http_server_request_duration_seconds_bucket[5m])) by (le)) > 1
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "High p95 request latency (> 1s)"
+            description: "The platform-wide p95 HTTP request latency has exceeded 1s for 10 minutes."

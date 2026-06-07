@@ -1,0 +1,17 @@
+# Internal headless Service for OpenSearch. Clients (OTel Collector, Grafana datasource) use
+# opensearch.observability.svc.cluster.local:9200. No external exposure.
+apiVersion: v1
+kind: Service
+metadata:
+  name: opensearch
+  namespace: observability
+  labels:
+    app: opensearch
+spec:
+  clusterIP: None
+  selector:
+    app: opensearch
+  ports:
+    - { name: http,      port: 9200, targetPort: 9200, protocol: TCP }
+    - { name: transport, port: 9300, targetPort: 9300, protocol: TCP }
+    - { name: metrics,   port: 9600, targetPort: 9600, protocol: TCP }

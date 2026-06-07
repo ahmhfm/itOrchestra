@@ -1,0 +1,135 @@
+# Helm values for open-telemetry/opentelemetry-collector - Phase 0.8 dev.
+# The cluster-local Collector: receives OTLP from every service and fans out:
+#   traces  -> Tempo (OTLP gRPC)
+#   metrics -> Prometheus (re-exported on :8889, scraped by Prometheus)
+#   logs    -> OpenSearch
+# Tail sampling keeps all errors/slow traces; sensitive headers are scrubbed before export.
+#
+# Requires the *contrib* image (tail_sampling processor + opensearch exporter live there).
+mode: deployment
+replicaCount: 1
+fullnameOverride: otel-collector
+
+image:
+  repository: otel/opentelemetry-collector-contrib
+command:
+  name: otelcol-contrib
+
+resources:
+  requests:
+    cpu: "100m"
+    memory: "128Mi"
+  limits:
+    cpu: "500m"
+    memory: "512Mi"
+
+# The chart's default config adds extra receivers (jaeger/zipkin/prometheus) we don't use in
+# dev; clear the default presets and define exactly what we need below.
+presets:
+  logsCollection:
+    enabled: false
+  kubernetesAttributes:
+    enabled: false
+
+# Expose OTLP in + the Prometheus exporter out on the Service.
+ports:
+  otlp:
+    enabled: true
+    containerPort: 4317
+    servicePort: 4317
+    protocol: TCP
+  otlp-http:
+    enabled: true
+    containerPort: 4318
+    servicePort: 4318
+    protocol: TCP
+  prom-export:
+    enabled: true
+    containerPort: 8889
+    servicePort: 8889
+    protocol: TCP
+  metrics:
+    enabled: false
+  jaeger-compact:
+    enabled: false
+  jaeger-thrift:
+    enabled: false
+  jaeger-grpc:
+    enabled: false
+  zipkin:
+    enabled: false
+
+config:
+  receivers:
+    # Replace the chart default to drop jaeger/zipkin and pin OTLP listeners.
+    otlp:
+      protocols:
+        grpc:
+          endpoint: 0.0.0.0:4317
+        http:
+          endpoint: 0.0.0.0:4318
+    jaeger: null
+    zipkin: null
+    prometheus: null
+  processors:
+    memory_limiter:
+      check_interval: 5s
+      limit_percentage: 80
+      spike_limit_percentage: 25
+    batch: {}
+    # Tail sampling: keep 100% of error + slow traces, 10% of the rest.
+    tail_sampling:
+      decision_wait: 5s
+      policies:
+        - name: errors
+          type: status_code
+          status_code:
+            status_codes: [ERROR]
+        - name: slow
+          type: latency
+          latency:
+            threshold_ms: 1000
+        - name: sample-rest
+          type: probabilistic
+          probabilistic:
+            sampling_percentage: 10
+    # Strip known sensitive headers captured as span attributes before export.
+    attributes/redact:
+      actions:
+        - { key: http.request.header.authorization,  action: delete }
+        - { key: http.request.header.cookie,         action: delete }
+        - { key: http.response.header.set-cookie,    action: delete }
+  exporters:
+    otlp/tempo:
+      endpoint: tempo.observability.svc.cluster.local:4317
+      tls:
+        insecure: true
+    # Re-export OTLP metrics in Prometheus format; Prometheus scrapes :8889 (see values).
+    prometheus:
+      endpoint: 0.0.0.0:8889
+      resource_to_telemetry_conversion:
+        enabled: true
+    opensearch:
+      http:
+        endpoint: http://opensearch.observability.svc.cluster.local:9200
+        tls:
+          insecure: true
+      logs_index: otel-logs
+  extensions:
+    health_check:
+      endpoint: 0.0.0.0:13133
+  service:
+    extensions: [health_check]
+    pipelines:
+      traces:
+        receivers: [otlp]
+        processors: [memory_limiter, tail_sampling, attributes/redact, batch]
+        exporters: [otlp/tempo]
+      metrics:
+        receivers: [otlp]
+        processors: [memory_limiter, batch]
+        exporters: [prometheus]
+      logs:
+        receivers: [otlp]
+        processors: [memory_limiter, attributes/redact, batch]
+        exporters: [opensearch]
