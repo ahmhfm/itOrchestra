@@ -21,8 +21,20 @@ SQLCMD="/opt/mssql-tools18/bin/sqlcmd"
 # SQL-Server-complexity-safe password (upper+lower+digit+special, hex tail).
 gen_pw() { echo "Aa1!$(openssl rand -hex 20)"; }
 
-echo "==> [0.7/mssql-ag] Ensuring namespace is NOT meshed"
-kubectl annotate namespace "${NS}" linkerd.io/inject=disabled --overwrite >/dev/null
+echo "==> [0.7/mssql-ag] Ensuring the 'mssql' namespace (baseline PSA, out of mesh)"
+# Self-contained: the namespace is also defined in k8s/namespaces/namespaces.yaml, but we
+# create it here so this phase runs without re-applying the whole namespaces manifest.
+kubectl apply -f - <<'EOF'
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: mssql
+  labels:
+    name: mssql
+    pod-security.kubernetes.io/enforce: baseline
+  annotations:
+    linkerd.io/inject: disabled
+EOF
 
 echo "==> Ensuring the mssql-ag-secret (SA + cert passwords)"
 if ! kubectl -n "${NS}" get secret mssql-ag-secret >/dev/null 2>&1; then
@@ -110,7 +122,7 @@ echo "==> [PRIMARY] Creating the Availability Group (CLUSTER_TYPE=NONE)"
 sqlq mssql-ag-0 "
 IF NOT EXISTS (SELECT 1 FROM sys.availability_groups WHERE name='${AG}')
   CREATE AVAILABILITY GROUP [${AG}]
-    WITH (CLUSTER_TYPE = NONE, DB_FAILOVER = ON, DATABASE_HEALTH_TRIGGER = ON)
+    WITH (CLUSTER_TYPE = NONE)
     FOR REPLICA ON
       N'${P_NAME}' WITH (
         ENDPOINT_URL = N'tcp://mssql-ag-0.${HEADLESS}:5022',
