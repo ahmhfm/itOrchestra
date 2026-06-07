@@ -150,9 +150,10 @@ kubectl -n mssql exec -i mssql-ag-0 -- /opt/mssql-tools18/bin/sqlcmd -S localhos
   Qdrant/Ollama unreachable (check the `ai` NetworkPolicy includes `ns-crewai`).
 - **Sidecar never gets identity** - confirm `allow-linkerd-egress` exists in `ns-crewai`
   (default-deny would otherwise block the proxy reaching the control plane).
-- **`SubmitTask`/`Query` times out** - first CPU generation is slow; retry / raise the client
-  deadline. To bypass CrewAI's heavier path, set `USE_CREWAI=false` on the Deployment (the
-  service then reasons via a single direct LLM call).
+- **`SubmitTask`/`Query` times out** - CPU generation is slow. Dev already defaults to
+  `USE_CREWAI=false` (a single direct LLM call, capped at `MAX_TOKENS=256`, `LLM_TIMEOUT_S=240`);
+  lower `MAX_TOKENS` further or raise `LLM_TIMEOUT_S` if the node is heavily loaded. The full
+  CrewAI crew loop (`USE_CREWAI=true`) issues several LLM calls and is only practical on GPU/prod.
 - **Empty `sources[]`** - expected in a fresh cluster: the 0.9 collections start empty, so RAG
   returns no grounding and the agent reasons cautiously. Ingest documents to populate them.
 - **DB provisioning failed** - ensure `mssql-ag-0` is the primary and the SA password is correct;
@@ -166,6 +167,7 @@ kubectl -n mssql exec -i mssql-ag-0 -- /opt/mssql-tools18/bin/sqlcmd -S localhos
 | Aspect | dev (this phase) | prod |
 |-------|------------------|------|
 | Auth | internal + NetworkPolicy only (JWT deferred) | **Keycloak JWT** validated on every gRPC call |
+| Reasoning | direct single LLM call (`USE_CREWAI=false`) | full CrewAI crew loop (`USE_CREWAI=true`) |
 | LLM | Ollama CPU `qwen2.5:1.5b` | vLLM on GPU, larger models |
 | Audit DB | `CrewAiDb` on the shared 0.7 AG instance | CrewAI's **own** private DB instance |
 | Action tools | safe stubs (no real changes) | **gRPC calls to the owning services** |

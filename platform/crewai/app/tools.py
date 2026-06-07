@@ -28,7 +28,7 @@ class SourceHit:
 
 # ---------- LLM (Ollama / vLLM, OpenAI-compatible chat) ----------
 
-def llm_chat(system_prompt: str, user_prompt: str, *, max_tokens: int = 512, temperature: float = 0.2) -> str:
+def llm_chat(system_prompt: str, user_prompt: str, *, max_tokens: int | None = None, temperature: float = 0.2) -> str:
     url = f"{CONFIG.llm_base_url.rstrip('/')}/chat/completions"
     payload = {
         "model": CONFIG.chat_model,
@@ -36,7 +36,7 @@ def llm_chat(system_prompt: str, user_prompt: str, *, max_tokens: int = 512, tem
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt},
         ],
-        "max_tokens": max_tokens,
+        "max_tokens": max_tokens or CONFIG.max_tokens,
         "temperature": temperature,
     }
     resp = requests.post(url, json=payload, timeout=CONFIG.llm_timeout_s)
