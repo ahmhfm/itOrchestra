@@ -76,7 +76,8 @@ kubectl -n "${NS}" wait --for=condition=complete job/qdrant-collections-init --t
 echo "==> Deploying Ollama (CPU: chat + embeddings)"
 kubectl apply -f "${SCRIPT_DIR}/ollama/service.yaml"
 kubectl apply -f "${SCRIPT_DIR}/ollama/deployment.yaml"
-kubectl -n "${NS}" rollout status deploy/ollama --timeout=300s
+# First run pulls the large Ollama image over a possibly slow link; allow plenty of time.
+kubectl -n "${NS}" rollout status deploy/ollama --timeout=900s
 echo "    pulling embedding model '${EMBED_MODEL}' (one-time, ~2.2GB) ..."
 kubectl -n "${NS}" exec deploy/ollama -- ollama pull "${EMBED_MODEL}"
 echo "    pulling chat model '${CHAT_MODEL}' (one-time, ~1GB) ..."
