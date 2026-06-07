@@ -1,0 +1,79 @@
+# HashiCorp Vault Helm values - itOrchestra (dev).
+# Chart 0.32.0 / Vault 1.21.2 / vault-k8s (Agent Injector) 1.7.2.
+#
+# Mode: standalone with integrated Raft storage on a Longhorn PVC (persistent across
+# restarts). Single replica for dev; prod runs an HA Raft cluster (3/5 nodes) with
+# auto-unseal via a cloud KMS/HSM and real TLS.
+#
+# TLS: disabled on the listener for dev (in-cluster only). Prod terminates real TLS.
+# Vault is NOT exposed publicly (no LoadBalancer / no YARP route) - it is reached only
+# in-cluster; the UI is opened via `kubectl port-forward`.
+
+global:
+  enabled: true
+  tlsDisable: true        # dev: plaintext in-cluster. Prod: false + PKI/cert-manager.
+
+server:
+  image:
+    repository: "hashicorp/vault"
+    tag: "1.21.2"
+
+  # Persistent Raft storage backed by Longhorn.
+  dataStorage:
+    enabled: true
+    size: 2Gi
+    storageClass: itorchestra-longhorn
+
+  # Single-node Raft (dev). HA Raft cluster in prod.
+  ha:
+    enabled: true
+    replicas: 1
+    raft:
+      enabled: true
+      setNodeId: true
+      config: |
+        ui = true
+        disable_mlock = true
+
+        listener "tcp" {
+          address       = "[::]:8200"
+          cluster_address = "[::]:8201"
+          tls_disable   = 1
+        }
+
+        storage "raft" {
+          path = "/vault/data"
+        }
+
+        service_registration "kubernetes" {}
+
+  resources:
+    requests:
+      cpu: "250m"
+      memory: "256Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+
+# Vault Agent Injector (mutating webhook): app pods opt in via annotations and get
+# secrets written to /vault/secrets/. Pinned image.
+injector:
+  enabled: true
+  image:
+    repository: "hashicorp/vault-k8s"
+    tag: "1.7.2"
+  agentImage:
+    repository: "hashicorp/vault"
+    tag: "1.21.2"
+  resources:
+    requests:
+      cpu: "50m"
+      memory: "64Mi"
+    limits:
+      cpu: "250m"
+      memory: "128Mi"
+
+# In-cluster UI/API service (ClusterIP). No external exposure.
+ui:
+  enabled: true
+  serviceType: "ClusterIP"

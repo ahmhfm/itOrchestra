@@ -67,7 +67,11 @@ metadata:
     name: vault
     pod-security.kubernetes.io/enforce: baseline
   annotations:
-    linkerd.io/inject: enabled
+    # Vault is critical infra and is NOT meshed in dev: a Linkerd sidecar on the
+    # Agent Injector (an admission webhook) breaks API-server -> webhook TLS calls,
+    # and it complicates Raft (8201) + the unseal/health flow. Meshed app pods still
+    # reach Vault in-cluster. Prod meshes Vault with opaque-ports/skip-inbound-ports.
+    linkerd.io/inject: disabled
 ---
 apiVersion: v1
 kind: Namespace

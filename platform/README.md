@@ -14,7 +14,7 @@ It is built incrementally, one step at a time, following the project plan
 | 0.2 | Linkerd service mesh (+ Linkerd CNI plugin chained on Cilium for `restricted` namespaces) | Done (dev) - `linkerd check` √, verify-0.2 6/6 |
 | 0.3 | YARP API Gateway (TLS, routing, rate limit, CORS, correlation-id; JWT deferred to 0.4) | Done (dev) - verify-0.3 5/5, LoadBalancer 10.178.95.241 |
 | 0.4 | Keycloak (IAM) + private MSSQL, behind YARP; realm `itorchestra-dev` imported | Done (dev) - verify-0.4 7/7 |
-| 0.5 | HashiCorp Vault | Not started |
+| 0.5 | HashiCorp Vault (Raft + Longhorn) + Agent Injector; KV v2 + Kubernetes auth; 0.4 secrets seeded | Done (dev) - verify-0.5 8/8 |
 | 0.6 | Redis (Cache + Streams) | Not started |
 | ... | ... | ... |
 
@@ -87,6 +87,34 @@ Layout: `k8s/cluster/linkerd/` (install scripts: dev CLI, viz, prod Helm),
 > (1) install the **Linkerd CNI plugin** (chained with Cilium) so injected pods satisfy the
 > `restricted` PodSecurity profile; (2) add `allow-linkerd` NetworkPolicies so meshed pods can
 > reach the control plane under default-deny. See [`docs/runbook-0.2.md`](docs/runbook-0.2.md).
+
+## Step 0.5 - Secrets (HashiCorp Vault)
+
+Stack: **HashiCorp Vault** (chart `0.32.0` / Vault `1.21.2`) with **integrated Raft storage**
+on a Longhorn PVC (persistent), the **Vault Agent Injector** (`vault-k8s 1.7.2`), **KV v2**
+and the **Kubernetes auth** method. Vault is reached only in-cluster (ClusterIP); it is never
+exposed publicly and never routed through YARP. The UI/CLI is opened via `kubectl port-forward`.
+
+```bash
+cd ~/itOrchestra/platform
+bash bootstrap/04-vault-dev.sh
+```
+
+The installer initializes + unseals Vault (1 key share - **dev only**, stored in
+`vault/vault-unseal-keys`), enables KV v2 at `secret/`, enables Kubernetes auth, seeds the
+Phase 0.4 secrets (`secret/itorchestra/{keycloak/admin,keycloak/db,gateway/keycloak}`), and
+creates a sample least-privilege policy + role (`itorchestra-gateway` -> SA `default` in
+`ns-gateway`). Workloads consume secrets at runtime via Agent Injector annotations (files
+under `/vault/secrets/`); see [`ai/skills/vault.md`](../ai/skills/vault.md).
+
+> **dev vs prod:** dev runs a single-node Raft with `tls_disable`, a single Shamir key, and a
+> persisted root token for convenience, and keeps Vault **out of the mesh** (a Linkerd sidecar
+> on the Injector's admission webhook breaks API-server TLS calls). Prod runs an HA Raft
+> cluster with real TLS, KMS auto-unseal, split Shamir keys, no persisted root token, and
+> meshes Vault with `opaque-ports`/`skip-inbound-ports`.
+
+Layout: `k8s/vault/` (`values.yaml`, `install-dev.sh`), `bootstrap/04-vault-dev.sh`,
+`bootstrap/verify-0.5.sh`, [`docs/runbook-0.5.md`](docs/runbook-0.5.md).
 
 ## Conventions (from the project rules)
 
