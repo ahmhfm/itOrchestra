@@ -1,0 +1,27 @@
+<!-- itOrchestra - repo-wide MSBuild defaults (Phase 0.11).
+     Applied to every .NET project at or below the repo root (currently platform/gateway, and
+     all future .NET services). Enforces the strict-analyzers + warnings-as-errors policy from
+     the architecture rules so the CI build fails on any analyzer/style violation. Individual
+     .csproj files may still override these (csproj wins on duplicates). -->
+<Project>
+
+  <PropertyGroup>
+    <!-- Language/runtime baseline (the SDK itself is pinned via global.json). -->
+    <LangVersion>14</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <InvariantGlobalization>true</InvariantGlobalization>
+
+    <!-- Strict quality gate: every warning (analyzer or compiler) is an error in CI. -->
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <AnalysisLevel>latest-Recommended</AnalysisLevel>
+    <AnalysisMode>Recommended</AnalysisMode>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+
+    <!-- Reproducible, CI-friendly builds. -->
+    <Deterministic>true</Deterministic>
+    <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
+  </PropertyGroup>
+
+</Project>

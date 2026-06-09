@@ -1,0 +1,104 @@
+# itOrchestra - CI/CD for the YARP API Gateway (.NET, Phase 0.3) using the Phase 0.11 pipeline.
+# PR: restore/format/build/test/scan + build image (no push). main/tags: + push to GHCR, sign
+# (Cosign), SBOM, then progressive deploy dev -> staging -> prod (staging/prod gated by their
+# GitHub Environment's required reviewers).
+name: gateway
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+    paths: &paths
+      - 'platform/gateway/**'
+      - 'platform/charts/itorchestra-service/**'
+      - 'platform/deploy/gateway/**'
+      - '.github/workflows/gateway.yml'
+      - '.github/workflows/ci-dotnet.yml'
+      - '.github/workflows/cd-helm.yml'
+      - '.github/actions/image-supply-chain/**'
+      - 'Directory.Build.props'
+      - '.editorconfig'
+      - 'global.json'
+  pull_request:
+    paths: *paths
+
+# Caller-level cap: a reusable workflow's job permissions cannot exceed these. The image job needs
+# packages:write (GHCR) + id-token:write (Cosign keyless OIDC), so they must be granted here.
+permissions:
+  contents: read
+  packages: write
+  id-token: write
+
+jobs:
+  prep:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.m.outputs.tag }}
+      push: ${{ steps.m.outputs.push }}
+      image: ${{ steps.m.outputs.image }}
+    steps:
+      - id: m
+        run: |
+          echo "tag=sha-$(echo '${{ github.sha }}' | cut -c1-12)" >> "$GITHUB_OUTPUT"
+          echo "image=ghcr.io/$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')/itorchestra-gateway" >> "$GITHUB_OUTPUT"
+          if [ "${{ github.event_name }}" != "pull_request" ] && { [ "${{ github.ref }}" = "refs/heads/main" ] || [ "${{ startsWith(github.ref, 'refs/tags/v') }}" = "true" ]; }; then
+            echo "push=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "push=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  ci:
+    needs: prep
+    uses: ./.github/workflows/ci-dotnet.yml
+    with:
+      service: gateway
+      project: platform/gateway/Gateway.csproj
+      context: platform/gateway
+      dockerfile: platform/gateway/Dockerfile
+      image: ${{ needs.prep.outputs.image }}
+      tag: ${{ needs.prep.outputs.tag }}
+      push: ${{ needs.prep.outputs.push == 'true' }}
+    secrets: inherit
+
+  deploy-dev:
+    needs: [prep, ci]
+    if: ${{ needs.prep.outputs.push == 'true' }}
+    uses: ./.github/workflows/cd-helm.yml
+    with:
+      environment: dev
+      chart: platform/charts/itorchestra-service
+      release: gateway
+      namespace: ns-gateway
+      values-file: platform/deploy/gateway/values-dev.yaml
+      image: ${{ needs.prep.outputs.image }}
+      tag: ${{ needs.prep.outputs.tag }}
+      apply: false
+    secrets: inherit
+
+  deploy-staging:
+    needs: [prep, deploy-dev]
+    uses: ./.github/workflows/cd-helm.yml
+    with:
+      environment: staging
+      chart: platform/charts/itorchestra-service
+      release: gateway
+      namespace: ns-gateway
+      values-file: platform/deploy/gateway/values-staging.yaml
+      image: ${{ needs.prep.outputs.image }}
+      tag: ${{ needs.prep.outputs.tag }}
+      apply: false
+    secrets: inherit
+
+  deploy-prod:
+    needs: [prep, deploy-staging]
+    uses: ./.github/workflows/cd-helm.yml
+    with:
+      environment: prod
+      chart: platform/charts/itorchestra-service
+      release: gateway
+      namespace: ns-gateway
+      values-file: platform/deploy/gateway/values-prod.yaml
+      image: ${{ needs.prep.outputs.image }}
+      tag: ${{ needs.prep.outputs.tag }}
+      apply: false
+    secrets: inherit

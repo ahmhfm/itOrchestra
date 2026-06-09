@@ -1,0 +1,97 @@
+# itOrchestra - reusable .NET service CI (Phase 0.11).
+# The standard pipeline every .NET service calls: restore -> format check -> strict build
+# (analyzers + warnings-as-errors via Directory.Build.props) -> test (Testcontainers) ->
+# `dotnet list package --vulnerable` -> optional Snyk -> build + scan + SBOM + push + sign.
+# The SDK is pinned by global.json (rollForward latestFeature).
+name: ci-dotnet
+
+on:
+  workflow_call:
+    inputs:
+      service:      { description: Logical service name (label only).            type: string, required: true }
+      project:      { description: Path to the .csproj to build/test.            type: string, required: true }
+      context:      { description: Docker build context.                          type: string, required: true }
+      dockerfile:   { description: Path to the Dockerfile.                         type: string, required: true }
+      image:        { description: Image repo without tag (ghcr.io/owner/name).    type: string, required: true }
+      tag:          { description: Image tag (usually sha-<short>).                type: string, required: true }
+      push:         { description: Push + sign on this run (main/tags only).       type: boolean, required: false, default: false }
+    secrets:
+      SNYK_TOKEN:   { description: Optional Snyk token; the Snyk step is skipped when absent. required: false }
+
+permissions:
+  contents: read
+
+jobs:
+  build-test:
+    name: build + test (${{ inputs.service }})
+    runs-on: ubuntu-latest
+    env:
+      # Mapped here so the Snyk step's `if` can test env (the secrets context is not available
+      # in step-level `if` conditions).
+      SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up .NET (from global.json)
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Restore
+        run: dotnet restore "${{ inputs.project }}"
+
+      - name: Format check (dotnet format --verify-no-changes)
+        run: dotnet format "${{ inputs.project }}" --verify-no-changes --no-restore
+
+      - name: Build (strict analyzers, warnings as errors)
+        run: dotnet build "${{ inputs.project }}" --configuration Release --no-restore
+
+      - name: Test (Testcontainers; auto-discovered *Tests.csproj)
+        run: |
+          set -euo pipefail
+          mapfile -t TESTS < <(find . -name '*Tests.csproj' -not -path '*/bin/*' -not -path '*/obj/*')
+          if [ "${#TESTS[@]}" -eq 0 ]; then
+            echo "::notice title=No tests::No *Tests.csproj found yet; skipping. Add a test project to enable Testcontainers tests."
+            exit 0
+          fi
+          for t in "${TESTS[@]}"; do
+            echo "==> dotnet test ${t}"
+            dotnet test "${t}" --configuration Release --logger "trx;LogFileName=test.trx"
+          done
+
+      - name: Dependency vulnerability scan (dotnet list package --vulnerable)
+        run: |
+          set -euo pipefail
+          dotnet list "${{ inputs.project }}" package --vulnerable --include-transitive 2>&1 | tee vuln.txt
+          if grep -q "has the following vulnerable packages" vuln.txt; then
+            echo "::error title=Vulnerable packages::Vulnerable NuGet packages detected (see log)."
+            exit 1
+          fi
+          echo "No vulnerable packages reported."
+
+      - name: Snyk (optional - skipped without SNYK_TOKEN)
+        if: ${{ env.SNYK_TOKEN != '' }}
+        uses: snyk/actions/dotnet@master
+        with:
+          args: --severity-threshold=high --file=${{ inputs.project }}
+
+  image:
+    name: image (${{ inputs.service }})
+    needs: build-test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write       # push to GHCR
+      id-token: write       # Cosign keyless (OIDC)
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build, scan, SBOM, push, sign
+        uses: ./.github/actions/image-supply-chain
+        with:
+          image: ${{ inputs.image }}
+          tag: ${{ inputs.tag }}
+          context: ${{ inputs.context }}
+          dockerfile: ${{ inputs.dockerfile }}
+          push: ${{ inputs.push }}
+          registry-username: ${{ github.actor }}
+          registry-password: ${{ secrets.GITHUB_TOKEN }}

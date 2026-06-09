@@ -1,0 +1,10 @@
+# itOrchestra - generic microservice Helm chart (Phase 0.11).
+# One reusable chart for every itOrchestra service (meshed gRPC or HTTP). Each service supplies a
+# per-environment values file (platform/deploy/<service>/values-<env>.yaml); the CD pipeline
+# overrides image.repository/image.tag with the signed image. `helm lint`/`helm template` run in CI.
+apiVersion: v2
+name: itorchestra-service
+description: Generic meshed microservice (Deployment + Service + optional NetworkPolicy) for itOrchestra.
+type: application
+version: 0.1.0
+appVersion: "0.11"

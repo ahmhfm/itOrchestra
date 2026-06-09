@@ -1,0 +1,61 @@
+# Defaults for the generic itOrchestra microservice chart. Override per service/environment in
+# platform/deploy/<service>/values-<env>.yaml. The CD pipeline injects image.repository/tag.
+nameOverride: ""
+fullnameOverride: ""
+
+replicas: 1
+
+image:
+  repository: ghcr.io/ahmhfm/itorchestra-service   # overridden by CD (--set image.repository)
+  tag: latest                                        # overridden by CD (--set image.tag, a signed digest tag)
+  pullPolicy: IfNotPresent
+
+# Meshed by default (Linkerd mTLS) - matches the platform's "all pod-to-pod traffic is meshed" rule.
+linkerd:
+  inject: true
+
+# Port the container listens on (gRPC 50051 or HTTP 8080, per service).
+containerPort: 8080
+
+service:
+  type: ClusterIP        # internal only; never LoadBalancer/NodePort (external traffic is via YARP)
+  port: 8080
+  # Linkerd treats a port named 'grpc' as HTTP/2. Use 'http' for REST services.
+  portName: http
+
+# Probe style: grpc | http | none.
+probes:
+  type: http
+  path: /healthz
+  initialDelaySeconds: 20
+  periodSeconds: 15
+  failureThreshold: 6
+
+# Pulled from ConfigMaps/Secrets created out-of-band (e.g. by the service installer / Vault).
+envFrom: []
+#  - configMapRef: { name: <svc>-config }
+#  - secretRef: { name: <svc>-secrets }
+env: []
+#  - { name: LOG_LEVEL, value: "INFO" }
+
+resources:
+  requests: { cpu: "100m", memory: "256Mi" }
+  limits:   { cpu: "1",    memory: "1Gi" }
+
+# 'restricted' Pod Security Standard defaults.
+podSecurityContext:
+  runAsNonRoot: true
+  seccompProfile:
+    type: RuntimeDefault
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: false
+  capabilities:
+    drop: ["ALL"]
+
+# Optional chart-managed NetworkPolicy. Disabled by default because services already ship their
+# own fine-grained policies; enable to let the chart render a default-deny + ingress allow-list.
+networkPolicy:
+  enabled: false
+  ingressFromNamespaces: []
+  ingressPort: 0

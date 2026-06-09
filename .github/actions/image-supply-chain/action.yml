@@ -1,0 +1,123 @@
+# itOrchestra - reusable supply-chain step for any container image (Phase 0.11).
+# One composite action used by every service CI: multi-stage build -> vulnerability scan (Trivy)
+# -> SBOM (Syft, SPDX) -> push to the internal registry (GHCR) -> keyless signing + SBOM
+# attestation (Cosign via GitHub OIDC). On pull requests it builds + scans + produces an SBOM but
+# does NOT push/sign (push=false); pushing/signing happen only on main/tags.
+#
+# The CALLING job must grant: permissions: { contents: read, packages: write, id-token: write }.
+name: image-supply-chain
+description: Build, scan (Trivy), SBOM (Syft), push (GHCR) and sign + attest (Cosign keyless) a container image.
+
+inputs:
+  image:
+    description: Image repository without tag (e.g. ghcr.io/owner/itorchestra-gateway).
+    required: true
+  tag:
+    description: Image tag (e.g. sha-<short> or a semver).
+    required: true
+  context:
+    description: Docker build context directory.
+    required: true
+  dockerfile:
+    description: Path to the Dockerfile.
+    required: true
+  push:
+    description: 'true to push + sign + attest; false (PR) to only build + scan + SBOM.'
+    required: false
+    default: 'false'
+  registry:
+    description: Container registry host.
+    required: false
+    default: ghcr.io
+  registry-username:
+    description: Registry username (used only when push=true).
+    required: false
+    default: ''
+  registry-password:
+    description: Registry password/token (used only when push=true).
+    required: false
+    default: ''
+  trivy-severity:
+    description: Severities that fail the build.
+    required: false
+    default: 'CRITICAL,HIGH'
+
+outputs:
+  digest:
+    description: The pushed image digest (empty on PR builds).
+    value: ${{ steps.build.outputs.digest }}
+  ref:
+    description: The fully-qualified image reference that was scanned/signed.
+    value: ${{ steps.ref.outputs.ref }}
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Log in to the registry (push only)
+      if: inputs.push == 'true'
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ inputs.registry }}
+        username: ${{ inputs.registry-username }}
+        password: ${{ inputs.registry-password }}
+
+    - name: Build (multi-stage) ${{ inputs.push == 'true' && '+ push' || '(local, for scanning)' }}
+      id: build
+      uses: docker/build-push-action@v6
+      with:
+        context: ${{ inputs.context }}
+        file: ${{ inputs.dockerfile }}
+        push: ${{ inputs.push }}
+        # On PRs we load the image into the local daemon so Trivy/Syft can read it without a push.
+        load: ${{ inputs.push != 'true' }}
+        tags: ${{ inputs.image }}:${{ inputs.tag }}
+        provenance: false
+
+    - name: Resolve the image reference to scan/sign
+      id: ref
+      shell: bash
+      run: |
+        if [ "${{ inputs.push }}" = "true" ]; then
+          echo "ref=${{ inputs.image }}@${{ steps.build.outputs.digest }}" >> "$GITHUB_OUTPUT"
+        else
+          echo "ref=${{ inputs.image }}:${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
+        fi
+
+    - name: Vulnerability scan (Trivy)
+      uses: aquasecurity/trivy-action@0.28.0
+      with:
+        image-ref: ${{ steps.ref.outputs.ref }}
+        format: table
+        exit-code: '1'              # fail the build on a fixable CRITICAL/HIGH finding
+        ignore-unfixed: true
+        vuln-type: os,library
+        severity: ${{ inputs.trivy-severity }}
+
+    - name: Generate SBOM (Syft, SPDX-JSON)
+      uses: anchore/sbom-action@v0
+      with:
+        image: ${{ steps.ref.outputs.ref }}
+        format: spdx-json
+        output-file: sbom.spdx.json
+        upload-artifact: true
+        artifact-name: sbom-${{ inputs.tag }}.spdx.json
+
+    - name: Install Cosign (push only)
+      if: inputs.push == 'true'
+      uses: sigstore/cosign-installer@v3
+
+    - name: Sign the image + attest the SBOM (keyless, push only)
+      if: inputs.push == 'true'
+      shell: bash
+      env:
+        COSIGN_YES: 'true'
+      run: |
+        set -euo pipefail
+        REF="${{ inputs.image }}@${{ steps.build.outputs.digest }}"
+        echo "==> cosign sign (keyless, GitHub OIDC) ${REF}"
+        cosign sign "${REF}"
+        echo "==> cosign attest SBOM (SPDX) ${REF}"
+        cosign attest --type spdxjson --predicate sbom.spdx.json "${REF}"

@@ -1,0 +1,78 @@
+# itOrchestra - reusable Helm deploy (Phase 0.11).
+# Environment-gated CD: `helm lint` -> `helm template` (render with the signed image) -> deploy.
+# The job binds to a GitHub Environment (dev/staging/prod); configure required reviewers on the
+# staging/prod environments to enforce the manual approval gate before this job can run.
+#
+# Deploy behaviour (dev cluster is the only real target today):
+#   - apply=false (default)        -> lint + template + server dry-run (scaffold; safe everywhere).
+#   - apply=true  + KUBE_CONFIG set -> real `helm upgrade --install` (needs a runner/kubeconfig
+#                                      with cluster access, e.g. a self-hosted runner on the VM).
+name: cd-helm
+
+on:
+  workflow_call:
+    inputs:
+      environment: { description: GitHub Environment (dev|staging|prod).   type: string, required: true }
+      chart:       { description: Path to the Helm chart.                  type: string, required: true }
+      release:     { description: Helm release name.                       type: string, required: true }
+      namespace:   { description: Target namespace.                        type: string, required: true }
+      values-file: { description: Env-specific values file.                type: string, required: true }
+      image:       { description: Image repository (no tag).               type: string, required: true }
+      tag:         { description: Image tag/digest to deploy.              type: string, required: true }
+      apply:       { description: Perform a real upgrade (needs KUBE_CONFIG). type: boolean, required: false, default: false }
+    secrets:
+      KUBE_CONFIG: { description: base64 kubeconfig for the target cluster (optional). required: false }
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: deploy ${{ inputs.release }} -> ${{ inputs.environment }}
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}      # <- approval gate (configure reviewers per env)
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: azure/setup-helm@v4
+
+      - name: helm lint
+        run: helm lint "${{ inputs.chart }}" --values "${{ inputs.values-file }}"
+
+      - name: helm template (render with the deployed image)
+        run: |
+          helm template "${{ inputs.release }}" "${{ inputs.chart }}" \
+            --namespace "${{ inputs.namespace }}" \
+            --values "${{ inputs.values-file }}" \
+            --set image.repository="${{ inputs.image }}" \
+            --set image.tag="${{ inputs.tag }}"
+
+      - name: Configure kubeconfig (if provided)
+        id: kube
+        run: |
+          if [ -n "${{ secrets.KUBE_CONFIG }}" ]; then
+            mkdir -p "$HOME/.kube"
+            echo "${{ secrets.KUBE_CONFIG }}" | base64 -d > "$HOME/.kube/config"
+            echo "have_kube=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "have_kube=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Deploy
+        run: |
+          set -euo pipefail
+          COMMON=( "${{ inputs.release }}" "${{ inputs.chart }}"
+                   --namespace "${{ inputs.namespace }}" --create-namespace
+                   --values "${{ inputs.values-file }}"
+                   --set image.repository="${{ inputs.image }}"
+                   --set image.tag="${{ inputs.tag }}" )
+          if [ "${{ inputs.apply }}" = "true" ] && [ "${{ steps.kube.outputs.have_kube }}" = "true" ]; then
+            echo "==> Real deploy to ${{ inputs.environment }}"
+            helm upgrade --install "${COMMON[@]}" --wait --timeout 5m
+          elif [ "${{ steps.kube.outputs.have_kube }}" = "true" ]; then
+            echo "==> Server-side dry-run against ${{ inputs.environment }} (apply=false)"
+            helm upgrade --install "${COMMON[@]}" --dry-run=server
+          else
+            echo "::notice title=Scaffold::No KUBE_CONFIG for '${{ inputs.environment }}'; lint + template only."
+            echo "Set the KUBE_CONFIG secret (and apply=true) once a runner can reach the cluster."
+          fi

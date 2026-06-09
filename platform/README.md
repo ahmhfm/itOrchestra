@@ -19,7 +19,8 @@ It is built incrementally, one step at a time, following the project plan
 | 0.7 | SQL Server Always On AG - reference 2-replica clusterless (read-scale) AG, cert-auth endpoints, auto-seeding; SA mirrored to Vault | Done (dev) - verify-0.7 8/8 |
 | 0.8 | Observability - OpenTelemetry Collector + Tempo + Prometheus + Grafana + AlertManager + OpenSearch; Grafana via YARP; creds mirrored to Vault | Done (dev) - verify-0.8 13/13 |
 | 0.9 | AI layer - Qdrant 3-node cluster (5 RAG collections) + Ollama (CPU) serving chat `qwen2.5:1.5b` + embeddings `bge-m3` (no GPU on this VM; vLLM/GPU is the prod path); internal-only, NetworkPolicy-fenced; Qdrant metrics to Prometheus; endpoints/key mirrored to Vault | Done (dev) - verify-0.9 11/11 |
-| 0.10 | CrewAI multi-agent orchestration - Python gRPC service (`itorchestra.crewai.v1`), 7 agents (Orchestrator/Security/Performance/Patch/PowerShell/Policy/Compliance) with roles/tasks/tools, Ollama LLM + Qdrant RAG backends, per-agent permissions matrix (auto vs. approval), full audit trail in `CrewAiDb` (0.7 AG, stored-procedures only), meshed + internal-only | Done (dev) - verify-0.10 |
+| 0.10 | CrewAI multi-agent orchestration - Python gRPC service (`itorchestra.crewai.v1`), 7 agents (Orchestrator/Security/Performance/Patch/PowerShell/Policy/Compliance) with roles/tasks/tools, Ollama LLM + Qdrant RAG backends, per-agent permissions matrix (auto vs. approval), full audit trail in `CrewAiDb` (0.7 AG, stored-procedures only), meshed + internal-only | Done (dev) - verify-0.10 12/12 |
+| 0.11 | CI/CD pipeline (GitHub Actions) - reusable workflows + a supply-chain composite action: restore/format/strict-build/test (Testcontainers) + `dotnet list --vulnerable`/Snyk/Dependabot/Trivy + buf lint/breaking + multi-stage Docker build + push to GHCR + Cosign keyless signing + Syft SBOM + Helm lint/template + env-gated deploy (dev/staging/prod); wired to gateway (.NET) + crewai (Python) | Done (dev) - verify-0.11 |
 | ... | ... | ... |
 
 ## Two deployment profiles
@@ -292,6 +293,43 @@ main}.py`, `proto/crewai.proto`, `requirements.txt`, `Dockerfile`, `build-and-im
 `k8s/crewai/` (`db/{01-database-and-login,02-schema}.sql`, `deployment.yaml`, `service.yaml`,
 `networkpolicy.yaml`, `scripts/grpc_smoke.py`, `install-dev.sh`), `bootstrap/09-crewai-dev.sh`,
 `bootstrap/verify-0.10.sh`, [`docs/runbook-0.10.md`](docs/runbook-0.10.md).
+
+## Step 0.11 - CI/CD pipeline (GitHub Actions)
+
+The **standard build/test/secure/sign/deploy pipeline** every service uses, as **reusable GitHub
+Actions workflows** plus one **composite action** for the container supply chain. Each service
+adopts it with a ~40-line caller workflow; the two services that exist today - the .NET
+**gateway** (0.3) and the Python **crewai** (0.10) - are already wired in.
+
+On a **pull request**: `dotnet restore` -> `dotnet format --verify-no-changes` -> strict build
+(Roslyn analyzers + warnings-as-errors via `Directory.Build.props`, SDK pinned by `global.json`)
+-> tests (auto-discovered `*Tests.csproj`, **Testcontainers**-ready) -> `dotnet list package
+--vulnerable` (+ optional **Snyk**) -> multi-stage **Docker build** -> **Trivy** image scan ->
+**Syft SBOM**; for crewai also **`buf lint` + `buf breaking`** on the `.proto` contract. On **push
+to `main` / tag `v*`**: the image is pushed to **GHCR**, **Cosign**-signed (keyless, GitHub OIDC)
+with the **SBOM attested**, then deployed via the generic `itorchestra-service` **Helm** chart
+through **dev -> staging -> prod**, with `staging`/`prod` gated by **GitHub Environment** required
+reviewers. **Dependabot** opens weekly dependency/security PRs across Actions, NuGet, pip, Docker.
+
+```bash
+cd ~/itOrchestra/platform
+bash bootstrap/10-cicd.sh        # validate the assets + print the one-time GitHub setup checklist
+```
+
+There is nothing to install into Kubernetes here - the pipeline lives in GitHub Actions. CD
+defaults to `helm lint` + `helm template` + server dry-run (safe scaffold); set a `KUBE_CONFIG`
+secret and `apply: true` (ideally on a self-hosted runner) for a real rollout.
+
+> **dev vs prod:** dev keeps CD as lint/template/dry-run, makes Snyk + reviewers optional, and
+> pushes to a private GHCR. Prod requires reviewers on staging/prod, enforces Snyk + signature
+> verification at admission, may mirror images into an internal Harbor, and deploys for real via
+> a self-hosted runner with cluster access.
+
+Layout: `.github/workflows/` (`ci-dotnet.yml`, `ci-python.yml`, `ci-proto.yml`, `cd-helm.yml`,
+`gateway.yml`, `crewai.yml`), `.github/actions/image-supply-chain/`, `.github/dependabot.yml`,
+`buf.yaml`, `Directory.Build.props`, `.editorconfig`, `platform/charts/itorchestra-service/`,
+`platform/deploy/<service>/values-<env>.yaml`, `bootstrap/10-cicd.sh`, `bootstrap/verify-0.11.sh`,
+[`docs/runbook-0.11.md`](docs/runbook-0.11.md).
 
 ## Conventions (from the project rules)
 

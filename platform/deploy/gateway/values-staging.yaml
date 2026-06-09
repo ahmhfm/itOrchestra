@@ -1,0 +1,16 @@
+# gateway (YARP) - staging environment values. image.repository/tag injected by CD.
+replicas: 2
+containerPort: 8080
+service:
+  type: ClusterIP
+  port: 8080
+  portName: http
+probes:
+  type: http
+  path: /
+  initialDelaySeconds: 15
+  periodSeconds: 15
+  failureThreshold: 6
+resources:
+  requests: { cpu: "250m", memory: "384Mi" }
+  limits:   { cpu: "1",    memory: "768Mi" }

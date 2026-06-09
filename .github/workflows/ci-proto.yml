@@ -1,0 +1,36 @@
+# itOrchestra - reusable Protobuf contract CI (Phase 0.11).
+# Lints every .proto module (buf.yaml) and enforces backward-compatibility by diffing the change
+# against the default branch. A PR that renumbers/removes a field or breaks wire/JSON compat
+# fails here, satisfying the "breaking-change detection on Protobuf contracts" rule.
+name: ci-proto
+
+on:
+  workflow_call:
+    inputs:
+      breaking-against:
+        description: Git ref to diff for breaking changes.
+        type: string
+        required: false
+        default: '.git#branch=main'
+
+permissions:
+  contents: read
+
+jobs:
+  buf:
+    name: buf lint + breaking
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0          # full history so `buf breaking --against .git#branch=main` works
+
+      - uses: bufbuild/buf-setup-action@v1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: buf lint
+        run: buf lint
+
+      - name: buf breaking (against ${{ inputs.breaking-against }})
+        run: buf breaking --against "${{ inputs.breaking-against }}"

@@ -1,0 +1,25 @@
+{{- if .Values.networkPolicy.enabled }}
+# Optional chart-managed allow-list ingress policy (off by default; services usually ship their
+# own). Renders only when networkPolicy.enabled=true.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "itorchestra-service.fullname" . }}-ingress
+  labels:
+    {{- include "itorchestra-service.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "itorchestra-service.selectorLabels" . | nindent 6 }}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        {{- range .Values.networkPolicy.ingressFromNamespaces }}
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ . }}
+        {{- end }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.networkPolicy.ingressPort }}
+{{- end }}

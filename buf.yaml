@@ -1,0 +1,26 @@
+# itOrchestra - Buf module config (Phase 0.11).
+# Single source of lint + backward-compatibility rules for all .proto contracts in the repo.
+# CI runs `buf lint` and `buf breaking --against '.git#branch=main'` so a PR cannot merge a
+# malformed or backward-incompatible contract change.
+version: v2
+
+modules:
+  # The CrewAI internal gRPC contract (Phase 0.10). New services add their proto dirs here.
+  - path: platform/crewai/proto
+
+lint:
+  # BASIC keeps the high-value structural rules (package defined, snake_case fields, enum casing,
+  # no trailing-comment drift) without forcing a rename of the already-shipped, already-consumed
+  # itorchestra.crewai.v1 contract (STANDARD's RPC_*_STANDARD_NAME / ENUM_VALUE_PREFIX would
+  # require breaking changes to a live contract).
+  use:
+    - BASIC
+  except:
+    # The proto lives under crewai/proto/ (to match the service's Dockerfile COPY layout) rather
+    # than itorchestra/crewai/v1/, so the directory-match rule is intentionally relaxed.
+    - PACKAGE_DIRECTORY_MATCH
+
+breaking:
+  # Wire/JSON compatibility: never renumber or remove fields, never change types (the rules).
+  use:
+    - FILE

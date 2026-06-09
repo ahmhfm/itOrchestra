@@ -1,0 +1,20 @@
+# crewai (gRPC) - dev environment values. image.repository/tag injected by CD.
+# Config/secrets come from the crewai-config ConfigMap + crewai-secrets Secret (created by the
+# service installer from Vault + the 0.9 AI layer), so they are referenced via envFrom here.
+replicas: 1
+containerPort: 50051
+service:
+  type: ClusterIP
+  port: 50051
+  portName: grpc
+probes:
+  type: grpc
+  initialDelaySeconds: 40
+  periodSeconds: 15
+  failureThreshold: 6
+envFrom:
+  - configMapRef: { name: crewai-config }
+  - secretRef: { name: crewai-secrets }
+resources:
+  requests: { cpu: "100m", memory: "384Mi" }
+  limits:   { cpu: "1",    memory: "1Gi" }

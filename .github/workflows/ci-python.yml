@@ -1,0 +1,71 @@
+# itOrchestra - reusable Python service CI (Phase 0.11).
+# Standard pipeline for Python services (e.g. the CrewAI orchestrator): lint + format check
+# (ruff) -> tests (pytest, auto-discovered) -> build + scan (Trivy) + SBOM (Syft) + push (GHCR)
+# + sign (Cosign). The .proto contract for the service is linted separately by ci-proto.yml.
+name: ci-python
+
+on:
+  workflow_call:
+    inputs:
+      service:     { description: Logical service name (label only).        type: string, required: true }
+      context:     { description: Service dir (build context + lint root).  type: string, required: true }
+      dockerfile:  { description: Path to the Dockerfile.                    type: string, required: true }
+      image:       { description: Image repo without tag.                    type: string, required: true }
+      tag:         { description: Image tag.                                 type: string, required: true }
+      python-version: { description: Python version.                         type: string, required: false, default: '3.12' }
+      push:        { description: Push + sign on this run (main/tags only).  type: boolean, required: false, default: false }
+
+permissions:
+  contents: read
+
+jobs:
+  lint-test:
+    name: lint + test (${{ inputs.service }})
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ inputs.python-version }}
+
+      - name: Install tooling
+        run: python -m pip install --upgrade pip ruff
+
+      - name: Lint (ruff check)
+        run: ruff check "${{ inputs.context }}"
+
+      - name: Format check (ruff format --check)
+        run: ruff format --check "${{ inputs.context }}"
+
+      - name: Test (pytest, if present)
+        run: |
+          set -euo pipefail
+          if find "${{ inputs.context }}" -type d -name tests -not -path '*/node_modules/*' | grep -q . \
+             || find "${{ inputs.context }}" -name 'test_*.py' -o -name '*_test.py' 2>/dev/null | grep -q .; then
+            python -m pip install pytest
+            pytest "${{ inputs.context }}"
+          else
+            echo "::notice title=No tests::No pytest tests found yet; skipping."
+          fi
+
+  image:
+    name: image (${{ inputs.service }})
+    needs: lint-test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build, scan, SBOM, push, sign
+        uses: ./.github/actions/image-supply-chain
+        with:
+          image: ${{ inputs.image }}
+          tag: ${{ inputs.tag }}
+          context: ${{ inputs.context }}
+          dockerfile: ${{ inputs.dockerfile }}
+          push: ${{ inputs.push }}
+          registry-username: ${{ github.actor }}
+          registry-password: ${{ secrets.GITHUB_TOKEN }}
