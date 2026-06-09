@@ -64,9 +64,16 @@ if [ "${RUN_BACKUP:-0}" = "1" ]; then
   echo "== 9) Live backup + restore smoke (ns-gateway) =="
   if command -v velero >/dev/null 2>&1; then
     B="verify-$(date +%s)"
-    velero backup create "${B}" --include-namespaces ns-gateway --wait -n "${NS}" >/dev/null 2>&1
-    PH="$(velero backup get "${B}" -n "${NS}" -o jsonpath='{.status.phase}' 2>/dev/null || true)"
-    [ "${PH}" = "Completed" ] && ok "on-demand backup '${B}' Completed" || bad "backup phase='${PH}'"
+    # --wait blocks until the backup finishes; read the final phase via kubectl (the velero CLI's
+    # `backup get` does not support -o jsonpath). ns-gateway is small, so this is quick.
+    velero backup create "${B}" --include-namespaces ns-gateway --wait -n "${NS}" >/dev/null 2>&1 || true
+    PH="$(kubectl -n "${NS}" get backup.velero.io "${B}" -o jsonpath='{.status.phase}' 2>/dev/null || true)"
+    if [ "${PH}" = "Completed" ]; then
+      ok "on-demand backup '${B}' Completed"
+      velero backup delete "${B}" --confirm -n "${NS}" >/dev/null 2>&1 || true
+    else
+      bad "backup phase='${PH}' (run: velero backup describe ${B} -n ${NS} --details)"
+    fi
   else
     bad "velero CLI not installed (skipping live smoke; set up the CLI or unset RUN_BACKUP)"
   fi
