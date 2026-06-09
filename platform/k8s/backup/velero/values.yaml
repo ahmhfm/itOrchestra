@@ -8,7 +8,7 @@
 # 'aws' provider works against it with path-style addressing.
 initContainers:
   - name: velero-plugin-for-aws
-    image: velero/velero-plugin-for-aws:v1.11.1
+    image: velero/velero-plugin-for-aws:v1.14.1   # plugin v1.14.x <-> Velero v1.18.x (chart 12.x)
     imagePullPolicy: IfNotPresent
     volumeMounts:
       - mountPath: /target

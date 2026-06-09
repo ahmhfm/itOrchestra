@@ -14,7 +14,7 @@ NS="backup"
 VAULT_NS="vault"
 MSSQL_NS="mssql"
 BUCKET="velero"
-VELERO_CHART_VERSION="${VELERO_CHART_VERSION:-8.7.0}"
+VELERO_CHART_VERSION="${VELERO_CHART_VERSION:-12.0.2}"   # chart 12.0.2 -> Velero v1.18.1
 MC_IMAGE="${MC_IMAGE:-minio/mc:RELEASE.2024-11-21T17-21-54Z}"
 BACKUP_HOSTPATH="${BACKUP_HOSTPATH:-/srv/itorchestra/backups/minio}"
 
@@ -43,10 +43,12 @@ kubectl -n "${NS}" rollout status deployment/minio --timeout=300s
 
 echo "==> Creating the '${BUCKET}' bucket (idempotent)"
 POD="minio-mc-$$"
+kubectl -n "${NS}" delete pod "${POD}" --ignore-not-found >/dev/null 2>&1 || true
 kubectl -n "${NS}" run "${POD}" --restart=Never --image="${MC_IMAGE}" \
   --env=MC_HOST_local="http://${MINIO_USER}:${MINIO_PW}@minio.${NS}.svc.cluster.local:9000" \
-  --command -- sh -c "mc mb -p local/${BUCKET} || true; mc ls local/${BUCKET} >/dev/null" >/dev/null 2>&1 || true
+  --command -- sh -c "mc mb -p local/${BUCKET}; mc ls local/" >/dev/null 2>&1 || true
 kubectl -n "${NS}" wait --for=jsonpath='{.status.phase}'=Succeeded "pod/${POD}" --timeout=120s >/dev/null 2>&1 || true
+echo "    mc output:"; kubectl -n "${NS}" logs "${POD}" 2>/dev/null | sed 's/^/      /' || true
 kubectl -n "${NS}" delete pod "${POD}" --ignore-not-found >/dev/null 2>&1 || true
 
 echo "==> Ensuring Velero's MinIO credentials (secret velero-minio, key 'cloud')"
@@ -61,7 +63,9 @@ kubectl -n "${NS}" create secret generic velero-minio --from-file=cloud="${CLOUD
 rm -f "${CLOUD_TMP}"
 
 echo "==> Installing Velero ${VELERO_CHART_VERSION} (chart) via Helm"
-helm repo add vmware-tanzu https://vmware-tanzu.github.io/helm-charts >/dev/null 2>&1 || true
+# Not silenced + --force-update: a transient failure to reach the chart repo must surface here
+# (and abort) rather than be hidden, then fail confusingly on the next 'helm repo update'.
+helm repo add vmware-tanzu https://vmware-tanzu.github.io/helm-charts --force-update
 helm repo update vmware-tanzu >/dev/null
 helm upgrade --install velero vmware-tanzu/velero \
   --namespace "${NS}" \
