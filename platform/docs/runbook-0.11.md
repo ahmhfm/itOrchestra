@@ -54,8 +54,10 @@ platform/
    errors (`Directory.Build.props`). SDK from `global.json`.
 2. **Format** - `dotnet format --verify-no-changes` (`.editorconfig`) / `ruff format --check`.
 3. **Test** - auto-discovers `*Tests.csproj` and runs `dotnet test`; GitHub-hosted runners have
-   Docker, so **Testcontainers** integration tests (e.g. real MSSQL) work out of the box. (No
-   test project yet => the step is a no-op notice; add one to turn it on.)
+   Docker, so **Testcontainers** integration tests work out of the box. The gateway ships a
+   reference suite (`platform/gateway.tests/`) that starts a **real upstream container**
+   (`traefik/whoami`) and asserts the gateway proxies to it, injects/propagates the
+   correlation-id, and strips spoofable `X-User-*` headers - a template for every service's tests.
 4. **Analyzers** - strict Roslyn analyzers run as part of the build.
 5. **Dependency CVEs** - `dotnet list package --vulnerable --include-transitive` (fails on a
    match) + optional **Snyk** (skipped without `SNYK_TOKEN`) + **Dependabot** (weekly PRs).

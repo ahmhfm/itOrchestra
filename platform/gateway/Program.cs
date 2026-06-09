@@ -189,3 +189,7 @@ static bool IsConsolePath(PathString path) =>
 
 static string GatewayVersion() =>
     typeof(Program).Assembly.GetName().Version?.ToString() ?? "0.0.0";
+
+// Exposes the implicit top-level Program type so the test project's WebApplicationFactory<Program>
+// can host the gateway in-process (Phase 0.11 integration tests). No runtime effect.
+public partial class Program { }

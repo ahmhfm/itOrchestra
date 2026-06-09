@@ -10,6 +10,7 @@ on:
     tags: ['v*']
     paths: &paths
       - 'platform/gateway/**'
+      - 'platform/gateway.tests/**'
       - 'platform/charts/itorchestra-service/**'
       - 'platform/deploy/gateway/**'
       - '.github/workflows/gateway.yml'
