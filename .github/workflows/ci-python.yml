@@ -46,9 +46,9 @@ jobs:
     name: lint + test (${{ inputs.service }})
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: ${{ inputs.python-version }}
 
@@ -84,7 +84,7 @@ jobs:
       packages: write
       id-token: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Build, scan, SBOM, push, sign
         uses: ./.github/actions/image-supply-chain
         with:
