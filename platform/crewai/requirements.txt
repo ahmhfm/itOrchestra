@@ -1,15 +1,17 @@
 # CrewAI orchestration service (Phase 0.10). Pinned with floors; dev image.
-grpcio>=1.81.0,<2
-grpcio-tools>=1.81.0,<2
-grpcio-health-checking>=1.81.0,<2
-grpcio-reflection>=1.81.0,<2
-# protobuf is CAPPED at <7 on purpose: grpcio-tools 1.81 requires protobuf>=6.33.5,<7. protobuf 7.x
-# exists on PyPI but no current grpcio supports it, so a major bump here makes the build
-# unresolvable. Dependabot is told to skip protobuf major bumps (.github/dependabot.yml) until the
-# gRPC stack catches up; this floor moves it forward to the 6.x line that grpcio actually supports.
-protobuf>=6.33.5,<7
-requests>=2.34.2,<3
-pymssql>=2.3.13,<3
+#
+# The gRPC stack + protobuf are a TIGHTLY-COUPLED set, pinned deliberately and upgraded by hand
+# (Dependabot is told to leave them alone in .github/dependabot.yml). Keeping protobuf on the 4/5
+# line holds grpcio-tools on the 1.7x line whose dependency tree resolves cleanly against crewai.
+# Forcing grpcio 1.81 / protobuf 6.x makes pip's resolver fight crewai's tree (resolution-too-deep
+# / unresolvable), so do not bump these without re-validating the full `pip install` end to end.
+grpcio>=1.62,<2
+grpcio-tools>=1.62,<2
+grpcio-health-checking>=1.62,<2
+grpcio-reflection>=1.62,<2
+protobuf>=4.25,<6
+requests>=2.31,<3
+pymssql>=2.3.0,<3
 # CrewAI multi-agent framework + LLM router (litellm extra so it can talk to Ollama via the
 # OpenAI-compatible surface). Dev defaults to USE_CREWAI=false (a single direct LLM call, which
 # is far faster on CPU); flip it to true on the prod/GPU profile to run the full crew loop.

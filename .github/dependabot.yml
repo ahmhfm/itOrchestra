@@ -33,13 +33,18 @@ updates:
     groups:
       python:
         patterns: ["*"]
-    # protobuf and grpcio must move together: grpcio-tools only supports the matching protobuf
-    # minor line (e.g. grpcio 1.81 -> protobuf 6.x). A standalone protobuf MAJOR bump (e.g. 6 -> 7)
-    # outruns the gRPC stack and makes `pip install` unresolvable, so we let the gRPC packages drive
-    # protobuf and skip protobuf major-version updates until grpcio adds support.
+    # The gRPC stack + protobuf are a tightly-coupled set: grpcio-tools only supports its matching
+    # protobuf line, and bumping them drags pip's resolver into crewai's deep dependency tree
+    # (we hit both ResolutionImpossible and resolution-too-deep when Dependabot raised them). They
+    # are pinned by hand in requirements.txt and upgraded together after validating the full build,
+    # so Dependabot is told to leave them alone here. It still bumps everything else (requests,
+    # pymssql, crewai, litellm, ...).
     ignore:
       - dependency-name: protobuf
-        update-types: ["version-update:semver-major"]
+      - dependency-name: grpcio
+      - dependency-name: grpcio-tools
+      - dependency-name: grpcio-health-checking
+      - dependency-name: grpcio-reflection
     labels: ["dependencies", "python"]
 
   # --- Docker base images ---
