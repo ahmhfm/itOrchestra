@@ -7,7 +7,7 @@ grpcio-reflection>=1.81.0,<2
 # exists on PyPI but no current grpcio supports it, so a major bump here makes the build
 # unresolvable. Dependabot is told to skip protobuf major bumps (.github/dependabot.yml) until the
 # gRPC stack catches up; this floor moves it forward to the 6.x line that grpcio actually supports.
-protobuf>=6.33.5,<7
+protobuf>=6.33.6,<7
 requests>=2.34.2,<3
 pymssql>=2.3.13,<3
 # CrewAI multi-agent framework + LLM router (litellm extra so it can talk to Ollama via the
