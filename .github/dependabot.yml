@@ -33,6 +33,13 @@ updates:
     groups:
       python:
         patterns: ["*"]
+    # protobuf and grpcio must move together: grpcio-tools only supports the matching protobuf
+    # minor line (e.g. grpcio 1.81 -> protobuf 6.x). A standalone protobuf MAJOR bump (e.g. 6 -> 7)
+    # outruns the gRPC stack and makes `pip install` unresolvable, so we let the gRPC packages drive
+    # protobuf and skip protobuf major-version updates until grpcio adds support.
+    ignore:
+      - dependency-name: protobuf
+        update-types: ["version-update:semver-major"]
     labels: ["dependencies", "python"]
 
   # --- Docker base images ---
