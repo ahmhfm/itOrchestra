@@ -10,3 +10,6 @@ pymssql>=2.3.0,<3
 # OpenAI-compatible surface). Dev defaults to USE_CREWAI=false (a single direct LLM call, which
 # is far faster on CPU); flip it to true on the prod/GPU profile to run the full crew loop.
 crewai[litellm]>=0.80
+# Floor litellm above CVE-2026-42208 (unauthorized data access/modification; fixed in 1.83.7).
+# Pulled transitively via crewai[litellm]; pinned here so the Trivy image gate stays green.
+litellm>=1.83.7
