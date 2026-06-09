@@ -49,6 +49,9 @@ jobs:
   build-test:
     name: build + test (${{ inputs.service }})
     runs-on: ubuntu-latest
+    # Hard ceiling so a misbehaving Testcontainers wait strategy (or a hung proxy test) fails the
+    # run in minutes instead of burning the default 6-hour budget.
+    timeout-minutes: 15
     env:
       # Mapped here so the Snyk step's `if` can test env (the secrets context is not available
       # in step-level `if` conditions).

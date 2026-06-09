@@ -14,9 +14,12 @@ namespace ItOrchestra.Gateway.Tests;
 // spoofable-header stripping - against a live backend rather than a mock.
 public sealed class GatewayFixture : IAsyncLifetime
 {
+    // traefik/whoami is a shell-less, scratch-based image, so an *internal* wait strategy (which
+    // execs inside the container) would hang. We wait on the *external* mapped port instead - a
+    // plain host-side TCP connect that needs nothing inside the container.
     private readonly IContainer _upstream = new ContainerBuilder("traefik/whoami:latest")
         .WithPortBinding(80, assignRandomHostPort: true)
-        .WithWaitStrategy(Wait.ForUnixContainer().UntilInternalTcpPortIsAvailable(80))
+        .WithWaitStrategy(Wait.ForUnixContainer().UntilExternalTcpPortIsAvailable(80))
         .Build();
 
     private WebApplicationFactory<Program>? _factory;
