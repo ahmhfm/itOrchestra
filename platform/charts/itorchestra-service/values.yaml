@@ -25,6 +25,19 @@ image:
 linkerd:
   inject: true
 
+# Extra pod annotations, merged with the Linkerd annotation. This is the generic hook for Vault
+# Agent runtime secret injection (the CD path) - a service opts in via its values-<env>.yaml, e.g.:
+#   podAnnotations:
+#     vault.hashicorp.com/agent-inject: "true"
+#     vault.hashicorp.com/role: "<service>"               # k8s-auth role bound to this svc's SA
+#     vault.hashicorp.com/agent-inject-secret-app.env: "secret/data/itorchestra/<svc>"
+#     vault.hashicorp.com/agent-inject-template-app.env: |
+#       {{- with secret "secret/data/itorchestra/<svc>" -}}
+#       KEY={{ index .Data.data "key" }}
+#       {{ end -}}
+# Keep the k8s Secret envFrom as a fallback; the app should prefer /vault/secrets/* when present.
+podAnnotations: {}
+
 # Port the container listens on (gRPC 50051 or HTTP 8080, per service).
 containerPort: 8080
 

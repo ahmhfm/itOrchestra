@@ -377,3 +377,12 @@ Layout: `k8s/backup/` (`namespace.yaml`, `minio/{pv-pvc,deployment,service}.yaml
   Kubernetes API, so they hold zero cluster RBAC = least privilege); they exist to give each
   workload a distinct identity for **Vault Kubernetes-auth**, auditing, and policy scoping. The
   Vault k8s-auth roles (`gateway`, `crewai`) bind exactly these SAs.
+- **Runtime secrets come from Vault via the Agent Injector**, not just k8s Secrets. `crewai` carries
+  `vault.hashicorp.com/agent-*` annotations: the agent logs in with the pod's dedicated SA and
+  renders `/vault/secrets/app.env` (DB password + Qdrant key) **before** the app starts; the app
+  (`config.py`) loads that file and only falls back to the k8s `crewai-secrets` env when it is
+  absent (the CD/Helm path or Vault unavailable). The generic chart exposes `podAnnotations` so any
+  service can opt in the same way. The gateway's only runtime secret is its TLS `.pfx` password
+  (the cert file itself is a k8s Secret), so its Vault-runtime wiring is deferred until it gains a
+  Vault-resident secret (JWT/OIDC client secret in a later phase); the `gateway` Vault role/policy
+  already exist for that.

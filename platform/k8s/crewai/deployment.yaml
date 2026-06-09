@@ -18,6 +18,23 @@ spec:
         app: crewai
       annotations:
         linkerd.io/inject: enabled
+        # Vault Agent Injector (Phase 0.12 hardening): the agent logs in with this pod's dedicated
+        # 'crewai' SA token (k8s-auth role 'crewai' -> policy itorchestra-crewai) and renders the
+        # service's runtime secrets to /vault/secrets/app.env BEFORE the app starts (init container).
+        # The k8s 'crewai-secrets' env still applies as a fallback if injection is disabled (the CD/
+        # Helm path) or unavailable. Agent runs as 10001 so the app user can read the rendered file.
+        vault.hashicorp.com/agent-inject: "true"
+        vault.hashicorp.com/role: "crewai"
+        vault.hashicorp.com/agent-run-as-user: "10001"
+        vault.hashicorp.com/agent-run-as-group: "10001"
+        vault.hashicorp.com/agent-inject-secret-app.env: "secret/data/itorchestra/shared/crewai"
+        vault.hashicorp.com/agent-inject-template-app.env: |
+          {{- with secret "secret/data/itorchestra/shared/crewai" -}}
+          DB_PASSWORD={{ index .Data.data "db-password" }}
+          {{ end -}}
+          {{- with secret "secret/data/itorchestra/shared/ai" -}}
+          QDRANT_API_KEY={{ index .Data.data "qdrant-api-key" }}
+          {{ end -}}
     spec:
       serviceAccountName: crewai
       automountServiceAccountToken: true

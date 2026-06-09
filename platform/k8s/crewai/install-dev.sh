@@ -88,34 +88,44 @@ kubectl -n "${NS}" create secret generic crewai-secrets \
 echo "==> Re-applying the AI NetworkPolicy so 'ai' admits ns-crewai (Qdrant/Ollama ingress)"
 kubectl apply -f "${SCRIPT_DIR}/../ai/networkpolicy.yaml"
 
-echo "==> Applying ServiceAccount, Service, Deployment, NetworkPolicies"
-kubectl apply -f "${SCRIPT_DIR}/serviceaccount.yaml"
-kubectl apply -f "${SCRIPT_DIR}/service.yaml"
-kubectl apply -f "${SCRIPT_DIR}/deployment.yaml"
-kubectl apply -f "${SCRIPT_DIR}/networkpolicy.yaml"
-# Roll the pod so it always picks up a refreshed config/secret on re-runs.
-kubectl -n "${NS}" rollout restart deploy/crewai
-
-echo "==> Waiting for the CrewAI rollout"
-kubectl -n "${NS}" rollout status deploy/crewai --timeout=300s
-
-echo "==> Mirroring the CrewAI endpoint into Vault (secret/itorchestra/shared/crewai)"
+echo "==> Mirroring the CrewAI endpoint + db-password into Vault (secret/itorchestra/shared/crewai)"
+# Seeded BEFORE the rollout so the new pod's Vault Agent init container can render db-password into
+# /vault/secrets/app.env on its first attempt (the itorchestra-crewai policy grants read on this path).
 ROOT_TOKEN="$(kubectl -n "${VAULT_NS}" get secret vault-unseal-keys -o jsonpath='{.data.root-token}' 2>/dev/null | base64 -d || true)"
 if [ -n "${ROOT_TOKEN}" ]; then
-  kubectl -n "${VAULT_NS}" exec -i vault-0 -- env \
-    VAULT_ADDR="http://127.0.0.1:8200" VAULT_TOKEN="${ROOT_TOKEN}" sh -s <<'EOSH'
+  # Non-fatal: if Vault is sealed/unavailable, warn and continue - the app still boots from the k8s
+  # 'crewai-secrets' env fallback (and the Vault Agent will render once Vault is reachable on re-run).
+  if ! kubectl -n "${VAULT_NS}" exec -i vault-0 -- env \
+    VAULT_ADDR="http://127.0.0.1:8200" VAULT_TOKEN="${ROOT_TOKEN}" APP_PW="${APP_PW}" sh -s <<'EOSH'
 set -e
 vault kv put secret/itorchestra/shared/crewai \
   grpc-endpoint="crewai.ns-crewai.svc.cluster.local:50051" \
   proto-package="itorchestra.crewai.v1" \
   db-name="CrewAiDb" \
   db-user="crewai_app" \
-  db-host="mssql-ag-primary.mssql.svc.cluster.local,1433"
-echo "  seeded: secret/itorchestra/shared/crewai"
+  db-host="mssql-ag-primary.mssql.svc.cluster.local,1433" \
+  db-password="$APP_PW"
+echo "  seeded: secret/itorchestra/shared/crewai (incl. db-password)"
 EOSH
+  then
+    echo "    !! Vault mirror skipped (Vault sealed/unavailable). App falls back to k8s env; re-run after unsealing." >&2
+  fi
 else
-  echo "    !! could not read Vault root token; skipping Vault mirror" >&2
+  echo "    !! could not read Vault root token; skipping Vault mirror (Vault Agent will fall back to k8s env)" >&2
 fi
+
+echo "==> Applying ServiceAccount, NetworkPolicies, Service, Deployment"
+kubectl apply -f "${SCRIPT_DIR}/serviceaccount.yaml"
+# NetworkPolicies first so the Vault-egress rule is in place before the rolled pod's Vault Agent
+# init container tries to reach Vault (avoids a default-deny race on the first init attempt).
+kubectl apply -f "${SCRIPT_DIR}/networkpolicy.yaml"
+kubectl apply -f "${SCRIPT_DIR}/service.yaml"
+kubectl apply -f "${SCRIPT_DIR}/deployment.yaml"
+# Roll the pod so it always picks up a refreshed config/secret on re-runs.
+kubectl -n "${NS}" rollout restart deploy/crewai
+
+echo "==> Waiting for the CrewAI rollout"
+kubectl -n "${NS}" rollout status deploy/crewai --timeout=300s
 
 echo "==> CrewAI state:"
 kubectl -n "${NS}" get pods,svc -o wide

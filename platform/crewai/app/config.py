@@ -16,6 +16,35 @@ def _b(name: str, default: bool) -> bool:
     return default if v is None else v.strip().lower() in ("1", "true", "yes", "on")
 
 
+def _load_vault_secrets(path: str = "/vault/secrets/app.env") -> None:
+    """Load secrets rendered at runtime by the Vault Agent Injector (KEY=VALUE per line) into the
+    process environment, taking precedence over the values baked into the pod env.
+
+    When the file is absent - injection disabled (the CD/Helm path), Vault unavailable, or running
+    outside Kubernetes - this is a silent no-op and the values fall back to the Kubernetes Secret
+    env vars. Must run BEFORE Config is defined, because the dataclass defaults read os.getenv at
+    class-definition time.
+    """
+    try:
+        with open(path, "r", encoding="utf-8") as fh:
+            for raw in fh:
+                line = raw.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                key, _, value = line.partition("=")
+                key = key.strip()
+                value = value.strip()
+                # Only override when the rendered value is non-empty, so a missing/blank Vault key
+                # can never clobber the Kubernetes Secret fallback already present in the env.
+                if key and value:
+                    os.environ[key] = value
+    except (FileNotFoundError, IsADirectoryError, PermissionError, OSError):
+        return
+
+
+_load_vault_secrets()
+
+
 @dataclass(frozen=True)
 class Config:
     # gRPC server

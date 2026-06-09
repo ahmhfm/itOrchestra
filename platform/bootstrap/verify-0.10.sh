@@ -30,6 +30,19 @@ R="$(kubectl -n "${NS}" get pod "${POD}" -o jsonpath='{.status.conditions[?(@.ty
 SA="$(kubectl -n "${NS}" get pod "${POD}" -o jsonpath='{.spec.serviceAccountName}' 2>/dev/null)"
 [ "${SA}" = "crewai" ] && ok "runs as dedicated ServiceAccount 'crewai' (not default)" || bad "pod SA='${SA}' (expected 'crewai')"
 
+echo "== 2b) Vault Agent injects runtime secrets (/vault/secrets/app.env) =="
+# The injected vault-agent sidecar proves the pod consumes secrets from Vault at runtime (not just
+# from the k8s Secret). The rendered file must carry DB_PASSWORD + QDRANT_API_KEY (non-empty).
+case " ${C} " in
+  *vault-agent*) ok "vault-agent sidecar injected" ;;
+  *) bad "no vault-agent sidecar (injection not applied)" ;;
+esac
+if [ -n "${POD}" ]; then
+  VKEYS="$(kubectl -n "${NS}" exec "${POD}" -c crewai -- sh -c 'cat /vault/secrets/app.env 2>/dev/null | grep -cE "^(DB_PASSWORD|QDRANT_API_KEY)=.+"' 2>/dev/null | tr -d '\r')"
+  [ "${VKEYS:-0}" -ge 1 ] 2>/dev/null && ok "/vault/secrets/app.env rendered by Vault Agent (${VKEYS}/2 keys)" \
+        || bad "Vault Agent secrets file missing/empty (keys='${VKEYS}')"
+fi
+
 echo "== 3) Strict external isolation =="
 EXT="$(kubectl -n "${NS}" get svc -o jsonpath='{range .items[*]}{.spec.type}{"\n"}{end}' 2>/dev/null | grep -E 'LoadBalancer|NodePort' || true)"
 [ -z "${EXT}" ] && ok "no LoadBalancer/NodePort Service (internal only)" || bad "external Service type found: ${EXT}"
