@@ -12,12 +12,15 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <InvariantGlobalization>true</InvariantGlobalization>
 
-    <!-- Strict quality gate: every warning (analyzer or compiler) is an error in CI. -->
+    <!-- Strict quality gate: every warning (compiler or default-enabled analyzer) is an error in
+         CI. We keep the SDK's DEFAULT analyzer rule set (the curated set every project is expected
+         to pass) rather than the much larger 'Recommended'/'All' modes, which would turn advisory
+         rules (CA1031 on catch-Exception boundaries, CA2007 ConfigureAwait, etc.) into hard errors
+         on legitimate edge/host code. Code formatting is enforced separately by the dedicated
+         `dotnet format --verify-no-changes` CI step, so EnforceCodeStyleInBuild is left off here. -->
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <EnableNETAnalyzers>true</EnableNETAnalyzers>
-    <AnalysisLevel>latest-Recommended</AnalysisLevel>
-    <AnalysisMode>Recommended</AnalysisMode>
-    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <AnalysisLevel>latest</AnalysisLevel>
 
     <!-- Reproducible, CI-friendly builds. -->
     <Deterministic>true</Deterministic>

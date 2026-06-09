@@ -1,0 +1,9 @@
+# Ruff config for the CrewAI service (Phase 0.11). `ruff check` is a CI gate; `ruff format` is
+# advisory for now (see ci-python.yml). Keeps the sensible default lint set (pyflakes + a subset
+# of pycodestyle) with a wider line length to match the existing code.
+line-length = 120
+target-version = "py312"
+
+[lint]
+# Default selection: pyflakes (F) + the high-signal pycodestyle errors (E4/E7/E9).
+select = ["E4", "E7", "E9", "F"]

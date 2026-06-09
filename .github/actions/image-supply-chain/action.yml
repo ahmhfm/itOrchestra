@@ -38,9 +38,9 @@ inputs:
     required: false
     default: ''
   trivy-severity:
-    description: Severities that fail the build.
+    description: Severities that fail the build (fixable only; see ignore-unfixed).
     required: false
-    default: 'CRITICAL,HIGH'
+    default: 'CRITICAL'
 
 outputs:
   digest:

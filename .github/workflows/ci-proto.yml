@@ -6,12 +6,6 @@ name: ci-proto
 
 on:
   workflow_call:
-    inputs:
-      breaking-against:
-        description: Git ref to diff for breaking changes.
-        type: string
-        required: false
-        default: '.git#branch=main'
 
 permissions:
   contents: read
@@ -23,14 +17,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0          # full history so `buf breaking --against .git#branch=main` works
+          fetch-depth: 0          # full history so the breaking-change baseline can be resolved
 
-      - uses: bufbuild/buf-setup-action@v1
+      # buf-action runs lint + breaking and resolves the breaking baseline automatically: the PR
+      # base on pull_request, and the parent commit on push (so it works in both, and is a no-op
+      # on the very first commit). Format/BSR-push are disabled - this is a CI gate only.
+      - uses: bufbuild/buf-action@v1
         with:
+          lint: true
+          format: false
+          breaking: true
+          push: false
+          pr_comment: false
           github_token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: buf lint
-        run: buf lint
-
-      - name: buf breaking (against ${{ inputs.breaking-against }})
-        run: buf breaking --against "${{ inputs.breaking-against }}"
