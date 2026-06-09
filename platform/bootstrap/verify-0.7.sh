@@ -53,6 +53,10 @@ for i in $(seq 1 12); do
 done
 [ "${DBSTATE}" = "ONLINE" ] && ok "platformref ONLINE on secondary (replicated)" || bad "platformref not online on secondary (state='${DBSTATE}')"
 
+echo "== ingress fence present (Phase 0.12 hardening) =="
+kubectl -n "${NS}" get networkpolicy mssql-ingress-fence >/dev/null 2>&1 \
+  && ok "mssql-ingress-fence NetworkPolicy present" || bad "mssql ingress fence missing"
+
 echo "========================================================"
 echo "Phase 0.7 verification: ${PASS} passed, ${FAIL} failed."
 echo "========================================================"

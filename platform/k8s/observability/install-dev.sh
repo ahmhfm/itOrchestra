@@ -116,6 +116,9 @@ wait_ready "app.kubernetes.io/name=opentelemetry-collector"
 echo "==> Opening gateway egress to Grafana (observability:3000)"
 kubectl apply -f "${SCRIPT_DIR}/gateway-egress.yaml"
 
+echo "==> Applying the observability ingress fence (intra-namespace + gateway->Grafana:3000)"
+kubectl apply -f "${SCRIPT_DIR}/networkpolicy.yaml"
+
 echo "==> Rebuilding the gateway image with the /grafana route, then restarting it"
 bash "${ROOT}/gateway/build-and-import-dev.sh"
 kubectl -n ns-gateway rollout restart deploy/gateway

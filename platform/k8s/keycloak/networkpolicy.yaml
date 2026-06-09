@@ -23,3 +23,37 @@ spec:
       ports:
         - { protocol: TCP, port: 4143 }   # Linkerd proxy inbound (meshed mTLS hop)
         - { protocol: TCP, port: 8080 }   # direct/non-meshed fallback
+---
+# Phase 0.12 hardening - INGRESS fence for the 'keycloak' namespace (meshed).
+#
+# Keycloak (8080) is reached only by the gateway proxying /realms, /admin, /resources, ... Since
+# both are meshed, the gateway's proxy dials Keycloak's proxy inbound (4143); 8080 is kept as a
+# non-meshed fallback. Keycloak talks to its OWN MSSQL (keycloak-mssql:1433) inside this namespace
+# (intra-namespace rule). linkerd-viz scrapes the proxy metrics (4191). The management/health port
+# (9000) is probed by the kubelet (node/host entity), which Cilium does not gate. Egress stays open
+# (Ingress-only policy) so Keycloak can reach its DB, DNS, and the Linkerd control plane.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: keycloak-ingress-fence
+  namespace: keycloak
+spec:
+  podSelector: {}
+  policyTypes: [Ingress]
+  ingress:
+    # Intra-namespace: Keycloak -> keycloak-mssql (1433) and any meshed mTLS hop between them.
+    - from:
+        - podSelector: {}
+    # HTTP from the gateway (meshed mTLS hop on 4143; 8080 direct fallback).
+    - from:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: ns-gateway }
+      ports:
+        - { protocol: TCP, port: 4143 }
+        - { protocol: TCP, port: 8080 }
+    # linkerd-viz proxy-metrics scrape so the sidecar stays observable.
+    - from:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: linkerd-viz }
+      ports:
+        - { protocol: TCP, port: 4191 }

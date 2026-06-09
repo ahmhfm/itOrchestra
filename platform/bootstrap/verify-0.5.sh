@@ -51,6 +51,10 @@ echo "== 6) Vault Agent Injector Ready =="
 INJ="$(kubectl -n "${NS}" get deploy -l app.kubernetes.io/name=vault-agent-injector -o jsonpath='{.items[0].status.readyReplicas}' 2>/dev/null)"
 [ "${INJ:-0}" -ge 1 ] 2>/dev/null && ok "vault-agent-injector Ready (${INJ})" || bad "injector not Ready (readyReplicas='${INJ}')"
 
+echo "== ingress fence present (Phase 0.12 hardening) =="
+kubectl -n "${NS}" get networkpolicy vault-ingress-fence >/dev/null 2>&1 \
+  && ok "vault-ingress-fence NetworkPolicy present" || bad "vault ingress fence missing"
+
 echo "========================================================"
 echo "Phase 0.5 verification: ${PASS} passed, ${FAIL} failed."
 echo "========================================================"

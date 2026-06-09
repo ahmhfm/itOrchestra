@@ -61,6 +61,10 @@ else
   esac
 fi
 
+echo "== ingress fence present (Phase 0.12 hardening) =="
+kubectl -n "${NS}" get networkpolicy keycloak-ingress-fence >/dev/null 2>&1 \
+  && ok "keycloak-ingress-fence NetworkPolicy present" || bad "keycloak ingress fence missing"
+
 echo "========================================================"
 echo "Phase 0.4 verification: ${PASS} passed, ${FAIL} failed."
 echo "========================================================"

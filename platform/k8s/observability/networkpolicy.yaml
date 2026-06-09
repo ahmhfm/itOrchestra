@@ -1,0 +1,28 @@
+# Phase 0.12 hardening - INGRESS fence for the 'observability' namespace (out of mesh).
+#
+# The internal data flows (Grafana -> Prometheus/Tempo/OpenSearch, OTel Collector -> OpenSearch/
+# Tempo, Prometheus -> kube-state-metrics/node-exporter, Alertmanager) are all intra-namespace.
+# The only cross-namespace ingress is the gateway proxying Grafana at /grafana (ns-gateway ->
+# grafana:3000). Prometheus SCRAPES other namespaces, but that is egress from here (left open) and
+# governed by the targets' own ingress rules. The prometheus-operator admission webhook and the
+# kubelet probes originate from the node/API-server (host entity), which Cilium does not gate by
+# NetworkPolicy. No app currently pushes OTLP/logs here; add an allow for 4317/4318 (OTel) or 9200
+# (OpenSearch) when a workload starts emitting. Egress is left open (Ingress-only policy).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: observability-ingress-fence
+  namespace: observability
+spec:
+  podSelector: {}
+  policyTypes: [Ingress]
+  ingress:
+    # Intra-namespace: the whole Grafana/Prometheus/Tempo/OpenSearch/Alertmanager mesh of flows.
+    - from:
+        - podSelector: {}
+    # Grafana (3000) from the gateway only, for the /grafana route through YARP.
+    - from:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: ns-gateway }
+      ports:
+        - { protocol: TCP, port: 3000 }

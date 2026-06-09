@@ -1,0 +1,18 @@
+# Phase 0.12 hardening - INGRESS fence for the 'redis' namespace (out of mesh).
+#
+# Redis is shared infra with NO cross-namespace network consumer yet (the only "access" today is
+# the Velero backup `SAVE` hook, which runs via `kubectl exec` and is not gated by NetworkPolicy).
+# Probes are in-pod `exec`, not network. So the fence allows intra-namespace only; when a service
+# adopts Redis (cache / Streams), add an explicit allow rule for its namespace on 6379 here AND a
+# matching egress rule on the consumer side. Egress is left open (Ingress-only policy).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: redis-ingress-fence
+  namespace: redis
+spec:
+  podSelector: {}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector: {}      # intra-namespace only (no external consumer yet)

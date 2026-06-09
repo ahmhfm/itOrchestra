@@ -82,6 +82,10 @@ for want in kube-prometheus-stack-86.2.0 tempo-1.24.4 opentelemetry-collector-0.
   esac
 done
 
+echo "== 9) Ingress fence present (Phase 0.12 hardening) =="
+kubectl -n "${NS}" get networkpolicy observability-ingress-fence >/dev/null 2>&1 \
+  && ok "observability-ingress-fence NetworkPolicy present" || bad "observability ingress fence missing"
+
 echo "========================================================"
 echo "Phase 0.8 verification: ${PASS} passed, ${FAIL} failed."
 echo "========================================================"

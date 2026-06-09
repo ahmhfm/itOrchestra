@@ -31,6 +31,9 @@ helm upgrade --install vault hashicorp/vault \
   --version "${CHART_VERSION}" \
   -f "${SCRIPT_DIR}/values.yaml"
 
+echo "==> Applying the Vault ingress fence (default-deny + agent consumers on 8200)"
+kubectl apply -f "${SCRIPT_DIR}/networkpolicy.yaml"
+
 echo "==> Waiting for the vault-0 pod to be Running (image pull may take a while)"
 for i in $(seq 1 120); do
   PHASE="$(kubectl -n "${NS}" get pod vault-0 -o jsonpath='{.status.phase}' 2>/dev/null || true)"

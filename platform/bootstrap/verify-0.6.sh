@@ -60,6 +60,10 @@ else
   bad "could not read Vault root token (Phase 0.5?)"
 fi
 
+echo "== ingress fence present (Phase 0.12 hardening) =="
+kubectl -n "${NS}" get networkpolicy redis-ingress-fence >/dev/null 2>&1 \
+  && ok "redis-ingress-fence NetworkPolicy present" || bad "redis ingress fence missing"
+
 echo "========================================================"
 echo "Phase 0.6 verification: ${PASS} passed, ${FAIL} failed."
 echo "========================================================"

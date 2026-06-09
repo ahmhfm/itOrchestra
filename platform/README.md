@@ -372,6 +372,13 @@ Layout: `k8s/backup/` (`namespace.yaml`, `minio/{pv-pvc,deployment,service}.yaml
 - NetworkPolicies are **default-deny** (ingress + egress); only DNS is allowed by default,
   everything else must be explicitly opened per service.
 - No secrets in Git - secrets come from Vault (step 0.5). The `.gitignore` blocks kubeconfig.
+- The shared **data-store / infra namespaces are ingress-fenced** (Phase 0.12): `vault`, `redis`,
+  `mssql`, `keycloak`, `observability` each carry a default-deny **Ingress** NetworkPolicy that
+  permits only intra-namespace traffic plus the explicit consumers (e.g. Vault `:8200` from
+  `ns-crewai`/`ns-gateway`; MSSQL `:1433` from `ns-crewai`; Keycloak `:4143/:8080` from `ns-gateway`
+  + linkerd-viz scrape; Grafana `:3000` from `ns-gateway`; Redis intra-only - no consumer yet).
+  Egress is left open on these (they must reach the K8s API / DNS / their own DBs); `kubectl exec`
+  and kubelet probes are host-sourced and not gated. `verify-0.4..0.8` assert each fence exists.
 - All third-party **Helm charts are version-pinned** in their installers (reproducible installs;
   no surprise upgrade/downgrade on re-run): vault `0.32.0`, velero `12.0.2`, longhorn `1.7.2`,
   cilium/ingress-nginx/metallb, kube-prometheus-stack `86.2.0`, tempo `1.24.4`,

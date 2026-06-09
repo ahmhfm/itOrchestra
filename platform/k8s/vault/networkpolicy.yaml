@@ -1,0 +1,29 @@
+# Phase 0.12 hardening - INGRESS fence for the 'vault' namespace (out of mesh).
+#
+# Vault is reached over the network only by the injected Vault Agents inside meshed app pods
+# (currently ns-crewai; ns-gateway holds a Vault k8s-auth role for the near future). All other
+# Vault access in dev (secret seeding, the verify scripts) is via `kubectl exec`, which is NOT
+# gated by NetworkPolicy. Egress is deliberately left open (Ingress-only policy) - the Vault
+# server must reach the Kubernetes API (ServiceAccount token review), DNS, etc.
+#
+# Single policy = fence + allow-list: it selects every pod and only permits the listed ingress,
+# so anything not matched is denied.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: vault-ingress-fence
+  namespace: vault
+spec:
+  podSelector: {}
+  policyTypes: [Ingress]
+  ingress:
+    # Intra-namespace: Raft peer/cluster traffic (8201) for HA + the agent-injector webhook pod.
+    - from:
+        - podSelector: {}
+    # Vault API (8200) from the app namespaces whose pods run a Vault Agent (k8s-auth login + KV).
+    - from:
+        - namespaceSelector:
+            matchExpressions:
+              - { key: kubernetes.io/metadata.name, operator: In, values: [ns-crewai, ns-gateway] }
+      ports:
+        - { protocol: TCP, port: 8200 }

@@ -26,9 +26,10 @@ else
   echo "    secret redis-auth already exists (skip)"
 fi
 
-echo "==> Applying Redis manifests (ConfigMap, Service, StatefulSet)"
+echo "==> Applying Redis manifests (ConfigMap, Service, NetworkPolicy, StatefulSet)"
 kubectl apply -f "${SCRIPT_DIR}/configmap.yaml"
 kubectl apply -f "${SCRIPT_DIR}/service.yaml"
+kubectl apply -f "${SCRIPT_DIR}/networkpolicy.yaml"
 kubectl apply -f "${SCRIPT_DIR}/statefulset.yaml"
 
 echo "==> Waiting for Redis to be Ready (first boot provisions the Longhorn PVC)"

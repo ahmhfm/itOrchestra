@@ -1,0 +1,27 @@
+# Phase 0.12 hardening - INGRESS fence for the 'mssql' namespace (Always On AG, out of mesh).
+#
+# Network consumers of the AG's TDS port (1433) are the owning microservices that hold a login on
+# a database here. In dev that is CrewAI (CrewAiDb audit store) only; add other service namespaces
+# as they are onboarded. The AG replicas also need their HADR mirroring endpoint (5022) and TDS
+# between pods - covered by the intra-namespace rule. Keycloak uses its OWN mssql in the keycloak
+# namespace, not this one. The Velero backup hook reaches MSSQL via `kubectl exec` (not gated).
+# Egress is left open (Ingress-only policy).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: mssql-ingress-fence
+  namespace: mssql
+spec:
+  podSelector: {}
+  policyTypes: [Ingress]
+  ingress:
+    # Intra-namespace: AG HADR endpoint (5022) + TDS (1433) between mssql-ag-0 / mssql-ag-1.
+    - from:
+        - podSelector: {}
+    # TDS (1433) from the owning service namespaces (dev: CrewAI's audit DB).
+    - from:
+        - namespaceSelector:
+            matchExpressions:
+              - { key: kubernetes.io/metadata.name, operator: In, values: [ns-crewai] }
+      ports:
+        - { protocol: TCP, port: 1433 }

@@ -51,6 +51,7 @@ CERT_PW="$(kubectl -n "${NS}" get secret mssql-ag-secret -o jsonpath='{.data.cer
 echo "==> Applying manifests (ConfigMap, Services, StatefulSet)"
 kubectl apply -f "${SCRIPT_DIR}/mssql-conf-configmap.yaml"
 kubectl apply -f "${SCRIPT_DIR}/service.yaml"
+kubectl apply -f "${SCRIPT_DIR}/networkpolicy.yaml"
 kubectl apply -f "${SCRIPT_DIR}/statefulset.yaml"
 
 echo "==> Waiting for both replicas to be Ready (first boot pulls the image + inits system DBs)"
