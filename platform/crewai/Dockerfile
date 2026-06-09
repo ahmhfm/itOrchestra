@@ -1,6 +1,6 @@
 # CrewAI orchestration service (Phase 0.10). Single-stage dev image on Python 3.12-slim.
 # Runs as a non-root user so it satisfies the 'restricted' Pod Security Standard.
-FROM python:3.12-slim
+FROM python:3.14-slim
 
 # Build deps for any sdists (pymssql ships manylinux wheels, but crewai's tree may compile).
 RUN apt-get update \
