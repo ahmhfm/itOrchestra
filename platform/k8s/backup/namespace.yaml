@@ -1,0 +1,12 @@
+# Phase 0.12 - Backup & DR namespace.
+# PSA 'privileged' because the Velero node-agent (kopia File System Backup) host-mounts the
+# kubelet pods dir to read PV contents. Out of the Linkerd mesh (infra, like vault/redis/mssql).
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: backup
+  labels:
+    name: backup
+    pod-security.kubernetes.io/enforce: privileged
+  annotations:
+    linkerd.io/inject: disabled

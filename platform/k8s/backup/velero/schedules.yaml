@@ -1,0 +1,64 @@
+# Velero Schedule (Phase 0.12): one daily full backup of every stateful + application namespace,
+# with app-consistent pre-hooks for the databases.
+#
+# Why hooks: File System Backup copies the live volume (crash-consistent only). The pre-hooks run
+# the engine's own consistent-snapshot command *inside the pod just before* the volume is copied:
+#   - MSSQL : EXEC master.dbo.sp_Maint_Backup_AllDatabases  -> writes COPY_ONLY .bak files onto
+#             the data PVC (the SQL itself lives in a stored procedure, per the platform rules);
+#             targeted at mssql-ag-0 only (the initial primary) so the secondary is left alone.
+#   - Redis : SAVE -> flushes a fresh dump.rdb (AOF is already on) before the volume is copied.
+#   - Vault : no exec hook (the raft snapshot needs a token); its /vault/data raft store is
+#             captured by FSB. For a guaranteed-consistent Vault backup run the documented
+#             `vault operator raft snapshot save` (see runbook-0.12.md).
+apiVersion: velero.io/v1
+kind: Schedule
+metadata:
+  name: daily-full
+  namespace: backup
+  labels:
+    app.kubernetes.io/part-of: itorchestra-backup
+spec:
+  schedule: "0 1 * * *"            # 01:00 daily (cluster TZ).
+  useOwnerReferencesInBackup: false
+  template:
+    ttl: 168h0m0s                  # keep each daily backup for 7 days.
+    defaultVolumesToFsBackup: true
+    includedNamespaces:
+      - vault
+      - redis
+      - mssql
+      - keycloak
+      - ai
+      - observability
+      - ns-gateway
+      - ns-crewai
+    hooks:
+      resources:
+        - name: mssql-consistent-backup
+          includedNamespaces: ["mssql"]
+          labelSelector:
+            matchLabels:
+              statefulset.kubernetes.io/pod-name: mssql-ag-0
+          pre:
+            - exec:
+                container: mssql
+                command:
+                  - /bin/sh
+                  - -c
+                  - '/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "$MSSQL_SA_PASSWORD" -C -b -Q "EXEC master.dbo.sp_Maint_Backup_AllDatabases"'
+                onError: Continue
+                timeout: 10m
+        - name: redis-consistent-save
+          includedNamespaces: ["redis"]
+          labelSelector:
+            matchLabels:
+              app: redis
+          pre:
+            - exec:
+                container: redis
+                command:
+                  - /bin/sh
+                  - -c
+                  - 'redis-cli -a "$REDIS_PASSWORD" --no-auth-warning SAVE'
+                onError: Continue
+                timeout: 5m

@@ -21,6 +21,7 @@ It is built incrementally, one step at a time, following the project plan
 | 0.9 | AI layer - Qdrant 3-node cluster (5 RAG collections) + Ollama (CPU) serving chat `qwen2.5:1.5b` + embeddings `bge-m3` (no GPU on this VM; vLLM/GPU is the prod path); internal-only, NetworkPolicy-fenced; Qdrant metrics to Prometheus; endpoints/key mirrored to Vault | Done (dev) - verify-0.9 11/11 |
 | 0.10 | CrewAI multi-agent orchestration - Python gRPC service (`itorchestra.crewai.v1`), 7 agents (Orchestrator/Security/Performance/Patch/PowerShell/Policy/Compliance) with roles/tasks/tools, Ollama LLM + Qdrant RAG backends, per-agent permissions matrix (auto vs. approval), full audit trail in `CrewAiDb` (0.7 AG, stored-procedures only), meshed + internal-only | Done (dev) - verify-0.10 12/12 |
 | 0.11 | CI/CD pipeline (GitHub Actions) - reusable workflows + a supply-chain composite action: restore/format/strict-build/test (Testcontainers) + `dotnet list --vulnerable`/Snyk/Dependabot/Trivy + buf lint/breaking + multi-stage Docker build + push to GHCR + Cosign keyless signing + Syft SBOM + Helm lint/template + env-gated deploy (dev/staging/prod); wired to gateway (.NET) + crewai (Python) | Done (dev) - verify-0.11; both pipelines green end-to-end on `main` (build+test -> image: Trivy/SBOM/GHCR/Cosign -> deploy dev/staging/prod). Hardened: format (`dotnet format`/`ruff`) + `buf breaking` are strict gates; GitHub Environments `dev`/`staging`/`prod` configured with required reviewers on staging/prod (approval gate exercised); CD wired for real rollout via `DEPLOY_RUNNER` var + `KUBE_CONFIG` secret (safe scaffold until set) |
+| 0.12 | Backup & DR - Velero (cluster resources + PV data via kopia File System Backup) targeting an in-cluster MinIO S3 endpoint whose bytes live on the VM host disk (`hostPath`, survives Longhorn/cluster loss); app-consistent backup hooks (MSSQL `COPY_ONLY` backup via a stored procedure, Redis `SAVE`); daily Schedule + 7-day retention; endpoint mirrored to Vault; DR runbook (namespace/DB/Vault restore + full rebuild) | Done (dev) - verify-0.12 |
 | ... | ... | ... |
 
 ## Two deployment profiles
@@ -330,6 +331,38 @@ Layout: `.github/workflows/` (`ci-dotnet.yml`, `ci-python.yml`, `ci-proto.yml`, 
 `buf.yaml`, `Directory.Build.props`, `.editorconfig`, `platform/charts/itorchestra-service/`,
 `platform/deploy/<service>/values-<env>.yaml`, `bootstrap/10-cicd.sh`, `bootstrap/verify-0.11.sh`,
 [`docs/runbook-0.11.md`](docs/runbook-0.11.md).
+
+## Step 0.12 - Backup & Disaster Recovery (Velero + MinIO)
+
+Stack: **Velero** backs up Kubernetes resources + persistent-volume data (kopia **File System
+Backup**) to an in-cluster **MinIO** S3 endpoint whose bytes live on the **VM host disk**
+(`hostPath`) - so a backup survives loss of Longhorn or the entire cluster (you never store the
+backups on the storage you are backing up). Application consistency is handled by Velero **backup
+hooks** that run each engine's own snapshot command just before the volume is copied: **MSSQL**
+runs a `COPY_ONLY` backup via a **stored procedure** (`sp_Maint_Backup_AllDatabases` - the SQL
+stays inside the database, per the platform rules) and **Redis** runs `SAVE`. A `daily-full`
+Schedule keeps 7 days of backups; the endpoint is mirrored into **Vault KV**
+(`secret/itorchestra/shared/backup`).
+
+```bash
+cd ~/itOrchestra/platform
+bash bootstrap/11-backup-dev.sh
+```
+
+The DR procedures (restore a namespace, MSSQL DB restore, Vault raft snapshot/restore, and a full
+cluster rebuild from the surviving `hostPath` bucket) are in
+[`docs/runbook-0.12.md`](docs/runbook-0.12.md).
+
+> **dev vs prod:** dev runs a single MinIO on `hostPath` with one daily schedule and 7-day
+> retention. Prod uses **off-cluster** object storage (a dedicated MinIO/S3 box or NFS appliance),
+> more frequent schedules + longer retention, encrypted backups, per-namespace restore RBAC,
+> periodic **restore drills**, and a scheduled `vault operator raft snapshot` + MSSQL log backups
+> for true point-in-time recovery.
+
+Layout: `k8s/backup/` (`namespace.yaml`, `minio/{pv-pvc,deployment,service}.yaml`,
+`velero/{values,schedules}.yaml`, `mssql/sp_maint_backup.sql`, `install-dev.sh`),
+`bootstrap/11-backup-dev.sh`, `bootstrap/verify-0.12.sh`,
+[`docs/runbook-0.12.md`](docs/runbook-0.12.md).
 
 ## Conventions (from the project rules)
 

@@ -1,0 +1,36 @@
+# MinIO durable storage for Phase 0.12.
+# The backup bytes MUST NOT live on the same Longhorn storage we are backing up - otherwise a
+# storage/cluster loss would take the backups with it. So MinIO is backed by a hostPath PV on
+# the VM's own filesystem (default /srv/itorchestra/backups/minio). reclaimPolicy: Retain so
+# deleting the PVC never erases the backups. In prod this is replaced by real off-cluster object
+# storage (S3/MinIO on a separate box) or an NFS appliance.
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: minio-backup-pv
+  labels:
+    app: minio
+spec:
+  capacity:
+    storage: 50Gi
+  accessModes: ["ReadWriteOnce"]
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: ""                 # static binding; no dynamic provisioner.
+  hostPath:
+    path: /srv/itorchestra/backups/minio
+    type: DirectoryOrCreate
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: minio-data
+  namespace: backup
+  labels:
+    app: minio
+spec:
+  accessModes: ["ReadWriteOnce"]
+  storageClassName: ""
+  volumeName: minio-backup-pv
+  resources:
+    requests:
+      storage: 50Gi

@@ -1,0 +1,16 @@
+# Internal-only ClusterIP for MinIO (Phase 0.12). 9000 = S3 API (Velero target),
+# 9001 = web console (reach via `kubectl port-forward`; never exposed externally).
+apiVersion: v1
+kind: Service
+metadata:
+  name: minio
+  namespace: backup
+  labels:
+    app: minio
+spec:
+  type: ClusterIP
+  selector:
+    app: minio
+  ports:
+    - { name: s3,      port: 9000, targetPort: 9000, protocol: TCP }
+    - { name: console, port: 9001, targetPort: 9001, protocol: TCP }

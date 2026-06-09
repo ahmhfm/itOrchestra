@@ -1,0 +1,47 @@
+# Velero (Phase 0.12) Helm values - the cluster backup/restore orchestrator.
+#
+# Backups = Kubernetes resources + PV data (File System Backup via kopia) written to the
+# in-cluster MinIO S3 endpoint (whose bytes live on the VM host disk). App-consistency for the
+# stateful stores is handled by Velero backup *hooks* (see schedules.yaml), not here.
+#
+# The AWS object-store plugin is added as an init container; MinIO speaks the S3 API so the
+# 'aws' provider works against it with path-style addressing.
+initContainers:
+  - name: velero-plugin-for-aws
+    image: velero/velero-plugin-for-aws:v1.11.1
+    imagePullPolicy: IfNotPresent
+    volumeMounts:
+      - mountPath: /target
+        name: plugins
+
+configuration:
+  # One default BackupStorageLocation pointing at MinIO.
+  backupStorageLocation:
+    - name: default
+      provider: aws
+      bucket: velero
+      default: true
+      config:
+        region: minio
+        s3ForcePathStyle: "true"
+        s3Url: http://minio.backup.svc.cluster.local:9000
+  # No CSI/cloud volume snapshots in dev - PV data is captured by File System Backup instead.
+  volumeSnapshotLocation: []
+  # Opt-out model: every pod volume is backed up by FSB unless explicitly excluded.
+  defaultVolumesToFsBackup: true
+
+# Credentials come from a pre-created secret (key 'cloud') holding the MinIO access keys.
+credentials:
+  useSecret: true
+  existingSecret: velero-minio
+
+# kopia/restic node-agent is required for File System Backup.
+deployNodeAgent: true
+snapshotsEnabled: false
+
+# Schedules are applied as explicit Schedule CRs (schedules.yaml) for readability.
+schedules: {}
+
+resources:
+  requests: { cpu: "100m", memory: "128Mi" }
+  limits:   { cpu: "500m", memory: "512Mi" }
