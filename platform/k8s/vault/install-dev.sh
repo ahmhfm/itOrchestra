@@ -95,18 +95,36 @@ vault secrets enable -path=secret kv-v2 2>/dev/null || echo "  kv-v2 already ena
 vault auth enable kubernetes 2>/dev/null || echo "  kubernetes auth already enabled"
 vault write auth/kubernetes/config kubernetes_host="https://kubernetes.default.svc:443"
 
-# Sample least-privilege policy: read-only on the gateway's secret subtree.
+# Least-privilege policy: read-only on the gateway's secret subtree.
 vault policy write itorchestra-gateway - <<'EOP'
 path "secret/data/itorchestra/gateway/*" {
   capabilities = ["read"]
 }
 EOP
 
-# Bind the policy to the gateway workload's ServiceAccount (dev: 'default' in ns-gateway).
+# Bind the policy to the gateway's DEDICATED ServiceAccount 'gateway' in ns-gateway (replaces the
+# shared 'default' SA - see k8s/gateway/serviceaccount.yaml).
 vault write auth/kubernetes/role/gateway \
-  bound_service_account_names=default \
+  bound_service_account_names=gateway \
   bound_service_account_namespaces=ns-gateway \
   policies=itorchestra-gateway \
+  ttl=1h
+
+# Least-privilege policy for CrewAI: read-only on its own secret + the shared AI secrets it needs
+# (Qdrant key / LLM endpoints). Bound to the dedicated 'crewai' SA in ns-crewai.
+vault policy write itorchestra-crewai - <<'EOP'
+path "secret/data/itorchestra/shared/crewai" {
+  capabilities = ["read"]
+}
+path "secret/data/itorchestra/shared/ai" {
+  capabilities = ["read"]
+}
+EOP
+
+vault write auth/kubernetes/role/crewai \
+  bound_service_account_names=crewai \
+  bound_service_account_namespaces=ns-crewai \
+  policies=itorchestra-crewai \
   ttl=1h
 
 # Seed the Phase 0.4 secrets (KV v2).

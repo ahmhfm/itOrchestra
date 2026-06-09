@@ -23,3 +23,12 @@ app: {{ include "itorchestra-service.fullname" . }}
 {{- define "itorchestra-service.selectorLabels" -}}
 app: {{ include "itorchestra-service.fullname" . }}
 {{- end -}}
+
+{{/* The ServiceAccount name: the configured name, else the release fullname (or 'default' when not created). */}}
+{{- define "itorchestra-service.serviceAccountName" -}}
+{{- if .Values.serviceAccount.create -}}
+{{- default (include "itorchestra-service.fullname" .) .Values.serviceAccount.name -}}
+{{- else -}}
+{{- default "default" .Values.serviceAccount.name -}}
+{{- end -}}
+{{- end -}}

@@ -18,6 +18,8 @@ spec:
         linkerd.io/inject: enabled
       {{- end }}
     spec:
+      serviceAccountName: {{ include "itorchestra-service.serviceAccountName" . }}
+      automountServiceAccountToken: {{ .Values.serviceAccount.automountServiceAccountToken }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:

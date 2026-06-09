@@ -24,9 +24,11 @@ echo "== 1) ns-crewai is meshed (linkerd-proxy injected) =="
 C="$(kubectl -n "${NS}" get pod "${POD}" -o jsonpath='{.spec.containers[*].name} {.spec.initContainers[*].name}' 2>/dev/null)"
 case " ${C} " in *linkerd-proxy*) ok "linkerd-proxy injected (in mesh)" ;; *) bad "no linkerd-proxy (expected meshed)" ;; esac
 
-echo "== 2) CrewAI pod Ready =="
+echo "== 2) CrewAI pod Ready + dedicated ServiceAccount =="
 R="$(kubectl -n "${NS}" get pod "${POD}" -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null)"
 [ "${R}" = "True" ] && ok "crewai pod Ready" || bad "crewai pod not Ready (status='${R}')"
+SA="$(kubectl -n "${NS}" get pod "${POD}" -o jsonpath='{.spec.serviceAccountName}' 2>/dev/null)"
+[ "${SA}" = "crewai" ] && ok "runs as dedicated ServiceAccount 'crewai' (not default)" || bad "pod SA='${SA}' (expected 'crewai')"
 
 echo "== 3) Strict external isolation =="
 EXT="$(kubectl -n "${NS}" get svc -o jsonpath='{range .items[*]}{.spec.type}{"\n"}{end}' 2>/dev/null | grep -E 'LoadBalancer|NodePort' || true)"

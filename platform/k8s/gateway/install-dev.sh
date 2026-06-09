@@ -27,7 +27,8 @@ else
   echo "    secret gateway-tls already exists (skip)"
 fi
 
-echo "==> Applying NetworkPolicies + Service + Deployment"
+echo "==> Applying ServiceAccount + NetworkPolicies + Service + Deployment"
+kubectl apply -f "${SCRIPT_DIR}/serviceaccount.yaml"
 kubectl apply -f "${ROOT}/k8s/network-policies/allow-linkerd.yaml"
 kubectl apply -f "${SCRIPT_DIR}/networkpolicy.yaml"
 kubectl apply -f "${SCRIPT_DIR}/service.yaml"

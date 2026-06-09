@@ -372,3 +372,8 @@ Layout: `k8s/backup/` (`namespace.yaml`, `minio/{pv-pvc,deployment,service}.yaml
 - NetworkPolicies are **default-deny** (ingress + egress); only DNS is allowed by default,
   everything else must be explicitly opened per service.
 - No secrets in Git - secrets come from Vault (step 0.5). The `.gitignore` blocks kubeconfig.
+- Each workload runs under its **own dedicated ServiceAccount** (e.g. `gateway`, `crewai`), never
+  the namespace `default` SA. The SAs carry **no** Role/RoleBinding (the services do not call the
+  Kubernetes API, so they hold zero cluster RBAC = least privilege); they exist to give each
+  workload a distinct identity for **Vault Kubernetes-auth**, auditing, and policy scoping. The
+  Vault k8s-auth roles (`gateway`, `crewai`) bind exactly these SAs.

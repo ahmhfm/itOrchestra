@@ -18,6 +18,8 @@ spec:
       labels:
         app: gateway
     spec:
+      serviceAccountName: gateway
+      automountServiceAccountToken: true
       securityContext:
         runAsNonRoot: true
         seccompProfile:

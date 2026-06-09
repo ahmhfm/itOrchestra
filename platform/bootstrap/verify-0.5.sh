@@ -30,11 +30,18 @@ case "${SECRETS}" in *"secret/"*kv*) ok "KV v2 mounted at secret/" ;; *"secret/"
 AUTHS="$(vx vault auth list 2>/dev/null || true)"
 case "${AUTHS}" in *kubernetes*) ok "kubernetes auth enabled" ;; *) bad "kubernetes auth missing" ;; esac
 
-echo "== 4) Gateway policy + role present =="
+echo "== 4) Gateway policy + role present (bound to the dedicated SA) =="
 POLICIES="$(vx vault policy list 2>/dev/null || true)"
 case "${POLICIES}" in *itorchestra-gateway*) ok "policy itorchestra-gateway exists" ;; *) bad "policy itorchestra-gateway missing" ;; esac
 ROLE="$(vx vault read auth/kubernetes/role/gateway 2>/dev/null || true)"
 case "${ROLE}" in *ns-gateway*) ok "k8s auth role 'gateway' bound to ns-gateway" ;; *) bad "role 'gateway' missing/misbound" ;; esac
+GSAN="$(vx vault read -field=bound_service_account_names auth/kubernetes/role/gateway 2>/dev/null || true)"
+case "${GSAN}" in *gateway*) ok "gateway role bound to SA 'gateway' (not default)" ;; *) bad "gateway role SA='${GSAN}' (expected 'gateway')" ;; esac
+
+echo "== 4b) CrewAI policy + role present (bound to the dedicated SA) =="
+case "${POLICIES}" in *itorchestra-crewai*) ok "policy itorchestra-crewai exists" ;; *) bad "policy itorchestra-crewai missing" ;; esac
+CSAN="$(vx vault read -field=bound_service_account_names auth/kubernetes/role/crewai 2>/dev/null || true)"
+case "${CSAN}" in *crewai*) ok "crewai role bound to SA 'crewai' in ns-crewai" ;; *) bad "crewai role missing/misbound (SA='${CSAN}')" ;; esac
 
 echo "== 5) Seeded secret readable =="
 GWSEC="$(vx vault kv get -field=client_secret secret/itorchestra/gateway/keycloak 2>/dev/null || true)"

@@ -5,6 +5,17 @@ fullnameOverride: ""
 
 replicas: 1
 
+# Dedicated ServiceAccount per service (security hardening). Each workload gets its OWN identity
+# instead of the namespace 'default' SA - used for Vault Kubernetes-auth, audit, and policy
+# scoping. No Role/RoleBinding is created (these services do not call the Kubernetes API, so they
+# carry ZERO cluster RBAC = least privilege). automount stays on because the Vault Agent uses the
+# SA token to log in to Vault.
+serviceAccount:
+  create: true
+  name: ""                              # defaults to the release fullname
+  annotations: {}
+  automountServiceAccountToken: true
+
 image:
   repository: ghcr.io/ahmhfm/itorchestra-service   # overridden by CD (--set image.repository)
   tag: latest                                        # overridden by CD (--set image.tag, a signed digest tag)

@@ -23,6 +23,8 @@ else
     *linkerd-proxy*) ok "linkerd-proxy sidecar injected" ;;
     *) bad "no linkerd-proxy sidecar (containers: ${INIT})" ;;
   esac
+  SA="$(kubectl -n "${NS}" get pod "${POD}" -o jsonpath='{.spec.serviceAccountName}' 2>/dev/null)"
+  [ "${SA}" = "gateway" ] && ok "runs as dedicated ServiceAccount 'gateway' (not default)" || bad "pod SA='${SA}' (expected 'gateway')"
 fi
 
 echo "== 2) LoadBalancer external IP assigned (MetalLB) =="

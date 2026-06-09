@@ -19,6 +19,8 @@ spec:
       annotations:
         linkerd.io/inject: enabled
     spec:
+      serviceAccountName: crewai
+      automountServiceAccountToken: true
       securityContext:
         runAsNonRoot: true
         runAsUser: 10001

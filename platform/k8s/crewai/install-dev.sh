@@ -88,7 +88,8 @@ kubectl -n "${NS}" create secret generic crewai-secrets \
 echo "==> Re-applying the AI NetworkPolicy so 'ai' admits ns-crewai (Qdrant/Ollama ingress)"
 kubectl apply -f "${SCRIPT_DIR}/../ai/networkpolicy.yaml"
 
-echo "==> Applying Service, Deployment, NetworkPolicies"
+echo "==> Applying ServiceAccount, Service, Deployment, NetworkPolicies"
+kubectl apply -f "${SCRIPT_DIR}/serviceaccount.yaml"
 kubectl apply -f "${SCRIPT_DIR}/service.yaml"
 kubectl apply -f "${SCRIPT_DIR}/deployment.yaml"
 kubectl apply -f "${SCRIPT_DIR}/networkpolicy.yaml"
