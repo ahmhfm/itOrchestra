@@ -4,6 +4,7 @@ STRICT RULE COMPLIANCE: this module NEVER issues inline DML. It only *calls stor
 by name* and passes parameters (the database user is granted EXEC only, so direct table access
 is impossible). Backend driver is pymssql; the database is CrewAiDb on the 0.7 AG primary.
 """
+
 from __future__ import annotations
 
 import logging
@@ -112,7 +113,9 @@ def list_pending(agent_kind: Optional[str], limit: int) -> list[dict[str, Any]]:
         return list(cur.fetchall())
 
 
-def set_approval(*, decision_id: str, approval_status: str, approver: str, reason: Optional[str]) -> Optional[dict[str, Any]]:
+def set_approval(
+    *, decision_id: str, approval_status: str, approver: str, reason: Optional[str]
+) -> Optional[dict[str, Any]]:
     with _conn() as c:
         cur = c.cursor(as_dict=True)
         cur.callproc("dbo.sp_CrewAi_Approval_SetStatus", (decision_id, approval_status, approver, reason))

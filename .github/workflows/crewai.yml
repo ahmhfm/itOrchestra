@@ -74,7 +74,8 @@ jobs:
       values-file: platform/deploy/crewai/values-dev.yaml
       image: ${{ needs.prep.outputs.image }}
       tag: ${{ needs.prep.outputs.tag }}
-      apply: false
+      apply: true
+      runner: ${{ vars.DEPLOY_RUNNER || 'ubuntu-latest' }}
     secrets: inherit
 
   deploy-staging:
@@ -88,7 +89,8 @@ jobs:
       values-file: platform/deploy/crewai/values-staging.yaml
       image: ${{ needs.prep.outputs.image }}
       tag: ${{ needs.prep.outputs.tag }}
-      apply: false
+      apply: true
+      runner: ${{ vars.DEPLOY_RUNNER || 'ubuntu-latest' }}
     secrets: inherit
 
   deploy-prod:
@@ -102,5 +104,6 @@ jobs:
       values-file: platform/deploy/crewai/values-prod.yaml
       image: ${{ needs.prep.outputs.image }}
       tag: ${{ needs.prep.outputs.tag }}
-      apply: false
+      apply: true
+      runner: ${{ vars.DEPLOY_RUNNER || 'ubuntu-latest' }}
     secrets: inherit

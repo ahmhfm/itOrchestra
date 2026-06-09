@@ -53,15 +53,15 @@ jobs:
           python-version: ${{ inputs.python-version }}
 
       - name: Install tooling
-        run: python -m pip install --upgrade pip ruff
+        # ruff is pinned so the formatter's output is deterministic across runs (a newer ruff could
+        # reformat differently and break the hard format gate below). Bump deliberately + reformat.
+        run: python -m pip install --upgrade pip "ruff==0.15.16"
 
       - name: Lint (ruff check)
         run: ruff check "${{ inputs.context }}"
 
-      - name: Format check (ruff format --check, advisory)
-        # Advisory: surfaces formatting drift without blocking. The existing service code predates
-        # ruff-format; run `ruff format` locally to adopt it, then flip this to a hard gate.
-        continue-on-error: true
+      - name: Format check (ruff format --check)
+        # Hard gate: code must already be `ruff format`-clean. Run `ruff format <ctx>` to fix.
         run: ruff format --check "${{ inputs.context }}"
 
       - name: Test (pytest, if present)

@@ -5,6 +5,7 @@ approval, and which are denied outright. This is the safety boundary between "AI
 "AI acts". Resolution order: exact action -> verb-prefix (``patch.*``) -> agent default ->
 global default. The global default is APPROVAL (fail-safe: never auto-run an unknown action).
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -12,9 +13,9 @@ from enum import Enum
 
 
 class Policy(str, Enum):
-    AUTO = "auto"          # safe / read-only: execute and audit
+    AUTO = "auto"  # safe / read-only: execute and audit
     APPROVAL = "approval"  # mutating / sensitive: park as PENDING_APPROVAL
-    DENY = "deny"          # never permitted
+    DENY = "deny"  # never permitted
 
 
 @dataclass(frozen=True)
@@ -46,9 +47,9 @@ AGENT_PERMISSIONS: dict[str, dict[str, Policy]] = {
     },
     "SECURITY": {
         **_COMMON,
-        "scan.vuln": Policy.AUTO,        # read-only scan -> advisory
+        "scan.vuln": Policy.AUTO,  # read-only scan -> advisory
         "assess.risk": Policy.AUTO,
-        "isolate.host": Policy.APPROVAL, # mutating containment
+        "isolate.host": Policy.APPROVAL,  # mutating containment
         "remediate": Policy.APPROVAL,
         "block.ip": Policy.APPROVAL,
     },
@@ -61,7 +62,7 @@ AGENT_PERMISSIONS: dict[str, dict[str, Policy]] = {
     },
     "PATCH": {
         **_COMMON,
-        "scan.patches": Policy.AUTO,     # report missing patches
+        "scan.patches": Policy.AUTO,  # report missing patches
         "patch.plan": Policy.AUTO,
         "patch.apply": Policy.APPROVAL,  # changes the system
         "reboot": Policy.APPROVAL,

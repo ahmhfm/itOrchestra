@@ -67,10 +67,8 @@ jobs:
       - name: Restore
         run: dotnet restore "${{ inputs.project }}"
 
-      - name: Format check (dotnet format --verify-no-changes, advisory)
-        # Advisory: surfaces formatting drift without blocking. Existing service code predates the
-        # repo .editorconfig; run `dotnet format` once to adopt it, then flip this to a hard gate.
-        continue-on-error: true
+      - name: Format check (dotnet format --verify-no-changes)
+        # Hard gate: code must match the repo .editorconfig. Run `dotnet format <project>` to fix.
         run: dotnet format "${{ inputs.project }}" --verify-no-changes --no-restore
 
       - name: Build (strict analyzers, warnings as errors)

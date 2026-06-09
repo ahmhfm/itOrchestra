@@ -4,6 +4,7 @@ All values come from the environment (populated by the Kubernetes Deployment fro
 ConfigMaps, which the install script seeds from Vault + the 0.9 AI layer). No secrets or
 endpoints are hardcoded here.
 """
+
 from __future__ import annotations
 
 import os

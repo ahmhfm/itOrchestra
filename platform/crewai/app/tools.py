@@ -5,6 +5,7 @@ Action tools are SAFE STUBS in dev - they describe what *would* be done but neve
 system, because the target services (assets/discovery/etc.) do not exist yet. When those land,
 the stubs are replaced by gRPC calls to the owning services (never direct DB access).
 """
+
 from __future__ import annotations
 
 import logging
@@ -27,6 +28,7 @@ class SourceHit:
 
 
 # ---------- LLM (Ollama / vLLM, OpenAI-compatible chat) ----------
+
 
 def llm_chat(system_prompt: str, user_prompt: str, *, max_tokens: int | None = None, temperature: float = 0.2) -> str:
     url = f"{CONFIG.llm_base_url.rstrip('/')}/chat/completions"
@@ -56,6 +58,7 @@ def llm_ok() -> bool:
 
 # ---------- Embeddings (Ollama native) ----------
 
+
 def embed(text: str) -> list[float]:
     url = f"{CONFIG.ollama_base_url.rstrip('/')}/api/embed"
     resp = requests.post(url, json={"model": CONFIG.embed_model, "input": text}, timeout=CONFIG.llm_timeout_s)
@@ -69,6 +72,7 @@ def embed(text: str) -> list[float]:
 
 
 # ---------- Vector search (Qdrant) ----------
+
 
 def _qdrant_headers() -> dict[str, str]:
     h = {"Content-Type": "application/json"}
@@ -129,11 +133,12 @@ def rag_context(question: str, collection: str, top_k: int = 5) -> tuple[str, li
 
     if not hits:
         return "", []
-    context = "\n\n".join(f"[{i+1}] {h.snippet}" for i, h in enumerate(hits) if h.snippet)
+    context = "\n\n".join(f"[{i + 1}] {h.snippet}" for i, h in enumerate(hits) if h.snippet)
     return context, hits
 
 
 # ---------- Safe action stubs (dev) ----------
+
 
 def stub_action(agent_kind: str, action: str, target: Optional[str], rationale: str) -> str:
     tgt = target or "(unspecified target)"

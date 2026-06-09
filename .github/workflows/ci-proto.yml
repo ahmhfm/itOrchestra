@@ -27,9 +27,7 @@ jobs:
       - name: buf lint
         run: buf lint
 
-      # Advisory for now: the baseline ('main') is not a local branch on PR checkouts (detached
-      # HEAD), and is a no-op on the first commit. Surfaces incompatibilities without blocking;
-      # flip to a hard gate once a stable baseline (BSR or a protected main) is wired in.
-      - name: buf breaking (advisory; baseline = main)
-        continue-on-error: true
-        run: buf breaking --against '.git#branch=main'
+      # Hard gate: no backward-incompatible contract change vs the default branch. The baseline is
+      # fetched straight from the remote so it resolves reliably on both PR (detached HEAD) and push.
+      - name: buf breaking (baseline = remote main)
+        run: buf breaking --against "https://github.com/${{ github.repository }}.git#branch=main"

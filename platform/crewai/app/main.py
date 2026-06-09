@@ -1,4 +1,5 @@
 """Entrypoint for the CrewAI orchestration gRPC server (Phase 0.10)."""
+
 from __future__ import annotations
 
 import logging
@@ -37,9 +38,7 @@ def serve() -> None:
         health_servicer = health.HealthServicer()
         health_pb2_grpc.add_HealthServicer_to_server(health_servicer, server)
         health_servicer.set("", health_pb2.HealthCheckResponse.SERVING)
-        health_servicer.set(
-            "itorchestra.crewai.v1.CrewOrchestrator", health_pb2.HealthCheckResponse.SERVING
-        )
+        health_servicer.set("itorchestra.crewai.v1.CrewOrchestrator", health_pb2.HealthCheckResponse.SERVING)
     except Exception as exc:  # noqa: BLE001
         log.warning("grpc health service unavailable: %s", exc)
 
@@ -57,8 +56,9 @@ def serve() -> None:
     bind = f"0.0.0.0:{CONFIG.grpc_port}"
     server.add_insecure_port(bind)  # mTLS is provided by the Linkerd sidecar in-mesh.
     server.start()
-    log.info("CrewAI orchestrator listening on %s (version=%s, crewai=%s)",
-             bind, CONFIG.service_version, CONFIG.use_crewai)
+    log.info(
+        "CrewAI orchestrator listening on %s (version=%s, crewai=%s)", bind, CONFIG.service_version, CONFIG.use_crewai
+    )
 
     stop = futures.ThreadPoolExecutor(max_workers=1)
 

@@ -5,6 +5,7 @@ on, this drives a single-agent CrewAI crew against the local LLM (Ollama, OpenAI
 on any import/runtime error (or when disabled) it falls back to a direct LLM call so the gRPC
 service stays responsive. Both paths produce the same kind of text rationale.
 """
+
 from __future__ import annotations
 
 import logging

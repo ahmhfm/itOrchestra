@@ -73,7 +73,8 @@ jobs:
       values-file: platform/deploy/gateway/values-dev.yaml
       image: ${{ needs.prep.outputs.image }}
       tag: ${{ needs.prep.outputs.tag }}
-      apply: false
+      apply: true
+      runner: ${{ vars.DEPLOY_RUNNER || 'ubuntu-latest' }}
     secrets: inherit
 
   deploy-staging:
@@ -87,7 +88,8 @@ jobs:
       values-file: platform/deploy/gateway/values-staging.yaml
       image: ${{ needs.prep.outputs.image }}
       tag: ${{ needs.prep.outputs.tag }}
-      apply: false
+      apply: true
+      runner: ${{ vars.DEPLOY_RUNNER || 'ubuntu-latest' }}
     secrets: inherit
 
   deploy-prod:
@@ -101,5 +103,6 @@ jobs:
       values-file: platform/deploy/gateway/values-prod.yaml
       image: ${{ needs.prep.outputs.image }}
       tag: ${{ needs.prep.outputs.tag }}
-      apply: false
+      apply: true
+      runner: ${{ vars.DEPLOY_RUNNER || 'ubuntu-latest' }}
     secrets: inherit

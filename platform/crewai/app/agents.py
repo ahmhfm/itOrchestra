@@ -5,6 +5,7 @@ Each has a role, goal, backstory and a set of tools. The Orchestrator routes an 
 to the right specialist when the caller does not pin an agent. These profiles feed both the
 gRPC ListAgents introspection and (when enabled) the CrewAI Agent definitions.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field

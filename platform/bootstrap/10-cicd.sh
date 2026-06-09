@@ -12,18 +12,19 @@ bash "${SCRIPT_DIR}/verify-0.11.sh"
 
 cat <<'EOS'
 
-==> One-time GitHub setup (do this once in the repository settings):
-    1. Environments: create 'dev', 'staging', 'prod'. Add Required reviewers to 'staging' and
-       'prod' (this is the deployment approval gate). Optionally restrict to the 'main' branch.
+==> GitHub setup:
+    1. Environments: 'dev', 'staging', 'prod' are configured (staging/prod require a reviewer and
+       are restricted to the main / v* branches). Adjust reviewers in Settings > Environments.
     2. GHCR: the workflows push to ghcr.io/<owner>/itorchestra-<service> using GITHUB_TOKEN
        (packages: write). No extra secret needed. Make the packages internal/private as desired.
     3. Cosign: signing is keyless via GitHub OIDC (id-token: write) - no keys to manage.
-    4. Optional secrets:
-         - SNYK_TOKEN  : enables the Snyk step (skipped silently if unset).
-         - KUBE_CONFIG : base64 kubeconfig for a real deploy; set apply=true in the caller and run
-                         the deploy job on a runner that can reach the cluster (e.g. a self-hosted
-                         runner on the VM). Without it, CD stays at lint + template (scaffold).
-    5. Branch protection on 'main': require the 'gateway' and 'crewai' status checks to pass.
+    4. Real deploy (callers already pass apply=true; CD stays at lint + template until BOTH are set):
+         - Register a self-hosted runner with cluster access (e.g. on the dev VM) and set the repo
+           VARIABLE  DEPLOY_RUNNER  to its label (deploy jobs then run there; defaults to
+           ubuntu-latest = scaffold-only).
+         - Add the SECRET  KUBE_CONFIG  (base64 kubeconfig) so the deploy job can reach the cluster.
+    5. Optional secret SNYK_TOKEN: enables the Snyk step (skipped silently if unset).
+    6. Branch protection on 'main': require the 'gateway' and 'crewai' status checks to pass.
 
 ==> [0.11/cicd] Done. Push to a branch / open a PR to exercise the pipeline.
 EOS

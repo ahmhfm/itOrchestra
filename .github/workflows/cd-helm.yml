@@ -41,10 +41,15 @@ on:
         type: string
         required: true
       apply:
-        description: Perform a real upgrade (needs KUBE_CONFIG).
+        description: Perform a real upgrade (needs KUBE_CONFIG + a runner with cluster access).
         type: boolean
         required: false
         default: false
+      runner:
+        description: Runner label(s). Set to a self-hosted label with cluster access for a real deploy.
+        type: string
+        required: false
+        default: ubuntu-latest
     secrets:
       KUBE_CONFIG:
         description: base64 kubeconfig for the target cluster (optional).
@@ -56,8 +61,8 @@ permissions:
 jobs:
   deploy:
     name: deploy ${{ inputs.release }} -> ${{ inputs.environment }}
-    runs-on: ubuntu-latest
-    environment: ${{ inputs.environment }}      # <- approval gate (configure reviewers per env)
+    runs-on: ${{ inputs.runner }}               # ubuntu-latest (scaffold) or a self-hosted label (real)
+    environment: ${{ inputs.environment }}      # <- approval gate (reviewers configured per env)
     steps:
       - uses: actions/checkout@v6
 

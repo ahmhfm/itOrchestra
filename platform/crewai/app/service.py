@@ -5,6 +5,7 @@ reason on the local LLM, enforce the permissions matrix (auto -> advisory / appr
 / deny -> rejected), and persist every decision to the audit DB. Exceptions are caught at this
 boundary and mapped to gRPC status codes (business errors vs. internal errors).
 """
+
 from __future__ import annotations
 
 import logging
@@ -41,7 +42,7 @@ def _status_value(status: str) -> int:
 
 
 def _correlation_id(context: grpc.ServicerContext) -> str:
-    for key, val in (context.invocation_metadata() or ()):
+    for key, val in context.invocation_metadata() or ():
         if key.lower() in ("x-correlation-id", "correlation-id"):
             return val
     return str(uuid.uuid4())
@@ -52,7 +53,6 @@ def _now() -> str:
 
 
 class CrewOrchestratorServicer(pb_grpc.CrewOrchestratorServicer):
-
     # ---------- SubmitTask ----------
     def SubmitTask(self, request, context):
         corr = _correlation_id(context)
@@ -104,8 +104,11 @@ class CrewOrchestratorServicer(pb_grpc.CrewOrchestratorServicer):
                 for h in sources:
                     try:
                         db.add_source(
-                            decision_id=effective_id, collection=h.collection,
-                            point_id=h.point_id, score=h.score, snippet=h.snippet,
+                            decision_id=effective_id,
+                            collection=h.collection,
+                            point_id=h.point_id,
+                            score=h.score,
+                            snippet=h.snippet,
                         )
                     except Exception as exc:  # noqa: BLE001
                         log.warning("add_source failed: %s", exc)
@@ -142,18 +145,28 @@ class CrewOrchestratorServicer(pb_grpc.CrewOrchestratorServicer):
             try:
                 did = str(uuid.uuid4())
                 db.insert_decision(
-                    decision_id=did, agent_kind="ORCHESTRATOR", status="ADVISORY",
-                    action="query.rag", target=collection, requires_approval=False,
-                    rationale=answer, requested_by=None, correlation_id=corr, idempotency_key=None,
+                    decision_id=did,
+                    agent_kind="ORCHESTRATOR",
+                    status="ADVISORY",
+                    action="query.rag",
+                    target=collection,
+                    requires_approval=False,
+                    rationale=answer,
+                    requested_by=None,
+                    correlation_id=corr,
+                    idempotency_key=None,
                 )
                 for h in hits:
-                    db.add_source(decision_id=did, collection=h.collection, point_id=h.point_id,
-                                  score=h.score, snippet=h.snippet)
+                    db.add_source(
+                        decision_id=did, collection=h.collection, point_id=h.point_id, score=h.score, snippet=h.snippet
+                    )
             except Exception as exc:  # noqa: BLE001 - auditing is best-effort for reads
                 log.warning("Query audit failed: %s", exc)
 
             return pb.QueryResponse(
-                answer=answer, sources=[self._src(h) for h in hits], correlation_id=corr,
+                answer=answer,
+                sources=[self._src(h) for h in hits],
+                correlation_id=corr,
             )
         except Exception as exc:  # noqa: BLE001
             log.exception("Query failed [corr=%s]: %s", corr, exc)
@@ -187,8 +200,10 @@ class CrewOrchestratorServicer(pb_grpc.CrewOrchestratorServicer):
                 context.set_details("decision_id and approver are required")
                 return pb.TaskDecision()
             row = db.set_approval(
-                decision_id=request.decision_id, approval_status=status,
-                approver=request.approver, reason=request.reason or None,
+                decision_id=request.decision_id,
+                approval_status=status,
+                approver=request.approver,
+                reason=request.reason or None,
             )
             if not row:
                 context.set_code(grpc.StatusCode.NOT_FOUND)
@@ -217,10 +232,14 @@ class CrewOrchestratorServicer(pb_grpc.CrewOrchestratorServicer):
                 return pb.TaskDecision()
             dec = self._row_to_decision(row)
             for s in db.get_sources(request.decision_id):
-                dec.sources.append(pb.SourceRef(
-                    collection=s.get("Collection", ""), point_id=str(s.get("PointId") or ""),
-                    score=float(s.get("Score") or 0.0), snippet=s.get("Snippet") or "",
-                ))
+                dec.sources.append(
+                    pb.SourceRef(
+                        collection=s.get("Collection", ""),
+                        point_id=str(s.get("PointId") or ""),
+                        score=float(s.get("Score") or 0.0),
+                        snippet=s.get("Snippet") or "",
+                    )
+                )
             return dec
         except Exception as exc:  # noqa: BLE001
             log.exception("GetDecision failed: %s", exc)
@@ -232,20 +251,30 @@ class CrewOrchestratorServicer(pb_grpc.CrewOrchestratorServicer):
     def ListAgents(self, request, context):
         agents = []
         for kind, p in PROFILES.items():
-            perms = [pb.PermissionEntry(action=a, auto_allowed=auto, denied=deny)
-                     for (a, auto, deny) in matrix_for(kind)]
-            agents.append(pb.AgentProfile(
-                kind=pb.AgentKind.Value(kind), name=p.name, role=p.role,
-                goal=p.goal, tools=list(p.tools), permissions=perms,
-            ))
+            perms = [
+                pb.PermissionEntry(action=a, auto_allowed=auto, denied=deny) for (a, auto, deny) in matrix_for(kind)
+            ]
+            agents.append(
+                pb.AgentProfile(
+                    kind=pb.AgentKind.Value(kind),
+                    name=p.name,
+                    role=p.role,
+                    goal=p.goal,
+                    tools=list(p.tools),
+                    permissions=perms,
+                )
+            )
         return pb.AgentCatalog(agents=agents)
 
     # ---------- Health ----------
     def Health(self, request, context):
         audit = db.ping()
         return pb.HealthResponse(
-            ok=audit, llm_ok=tools.llm_ok(), vector_ok=tools.vector_ok(),
-            audit_ok=audit, version=CONFIG.service_version,
+            ok=audit,
+            llm_ok=tools.llm_ok(),
+            vector_ok=tools.vector_ok(),
+            audit_ok=audit,
+            version=CONFIG.service_version,
         )
 
     # ---------- helpers ----------
