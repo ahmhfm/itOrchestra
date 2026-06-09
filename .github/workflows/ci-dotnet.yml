@@ -57,10 +57,10 @@ jobs:
       # in step-level `if` conditions).
       SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Set up .NET (from global.json)
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           global-json-file: global.json
 
@@ -114,7 +114,7 @@ jobs:
       packages: write       # push to GHCR
       id-token: write       # Cosign keyless (OIDC)
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Build, scan, SBOM, push, sign
         uses: ./.github/actions/image-supply-chain
         with:
