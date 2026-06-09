@@ -7,13 +7,36 @@ name: ci-python
 on:
   workflow_call:
     inputs:
-      service:     { description: Logical service name (label only).        type: string, required: true }
-      context:     { description: Service dir (build context + lint root).  type: string, required: true }
-      dockerfile:  { description: Path to the Dockerfile.                    type: string, required: true }
-      image:       { description: Image repo without tag.                    type: string, required: true }
-      tag:         { description: Image tag.                                 type: string, required: true }
-      python-version: { description: Python version.                         type: string, required: false, default: '3.12' }
-      push:        { description: Push + sign on this run (main/tags only).  type: boolean, required: false, default: false }
+      service:
+        description: Logical service name (label only).
+        type: string
+        required: true
+      context:
+        description: Service dir (build context + lint root).
+        type: string
+        required: true
+      dockerfile:
+        description: Path to the Dockerfile.
+        type: string
+        required: true
+      image:
+        description: Image repo without tag.
+        type: string
+        required: true
+      tag:
+        description: Image tag.
+        type: string
+        required: true
+      python-version:
+        description: Python version.
+        type: string
+        required: false
+        default: '3.12'
+      push:
+        description: Push + sign on this run (main/tags only).
+        type: boolean
+        required: false
+        default: false
 
 permissions:
   contents: read

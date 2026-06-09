@@ -12,16 +12,43 @@ name: cd-helm
 on:
   workflow_call:
     inputs:
-      environment: { description: GitHub Environment (dev|staging|prod).   type: string, required: true }
-      chart:       { description: Path to the Helm chart.                  type: string, required: true }
-      release:     { description: Helm release name.                       type: string, required: true }
-      namespace:   { description: Target namespace.                        type: string, required: true }
-      values-file: { description: Env-specific values file.                type: string, required: true }
-      image:       { description: Image repository (no tag).               type: string, required: true }
-      tag:         { description: Image tag/digest to deploy.              type: string, required: true }
-      apply:       { description: Perform a real upgrade (needs KUBE_CONFIG). type: boolean, required: false, default: false }
+      environment:
+        description: GitHub Environment (dev|staging|prod).
+        type: string
+        required: true
+      chart:
+        description: Path to the Helm chart.
+        type: string
+        required: true
+      release:
+        description: Helm release name.
+        type: string
+        required: true
+      namespace:
+        description: Target namespace.
+        type: string
+        required: true
+      values-file:
+        description: Env-specific values file.
+        type: string
+        required: true
+      image:
+        description: Image repository (no tag).
+        type: string
+        required: true
+      tag:
+        description: Image tag/digest to deploy.
+        type: string
+        required: true
+      apply:
+        description: Perform a real upgrade (needs KUBE_CONFIG).
+        type: boolean
+        required: false
+        default: false
     secrets:
-      KUBE_CONFIG: { description: base64 kubeconfig for the target cluster (optional). required: false }
+      KUBE_CONFIG:
+        description: base64 kubeconfig for the target cluster (optional).
+        required: false
 
 permissions:
   contents: read
