@@ -14,10 +14,9 @@ namespace ItOrchestra.Gateway.Tests;
 // spoofable-header stripping - against a live backend rather than a mock.
 public sealed class GatewayFixture : IAsyncLifetime
 {
-    private readonly IContainer _upstream = new ContainerBuilder()
-        .WithImage("traefik/whoami:latest")
+    private readonly IContainer _upstream = new ContainerBuilder("traefik/whoami:latest")
         .WithPortBinding(80, assignRandomHostPort: true)
-        .WithWaitStrategy(Wait.ForUnixContainer().UntilPortIsAvailable(80))
+        .WithWaitStrategy(Wait.ForUnixContainer().UntilInternalTcpPortIsAvailable(80))
         .Build();
 
     private WebApplicationFactory<Program>? _factory;
