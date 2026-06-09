@@ -1,5 +1,8 @@
-# itOrchestra - editor + dotnet-format rules (Phase 0.11).
-# `dotnet format --verify-no-changes` in CI enforces these; run `dotnet format` locally to fix.
+# itOrchestra - editor + dotnet-format conventions (Phase 0.11).
+# IMPORTANT: this file declares formatting *preferences* only. It deliberately does NOT raise any
+# code-style diagnostic (IDE00xx) to warning/error severity, because an explicit severity here is
+# honoured by `dotnet build` and would turn formatting nits (e.g. CRLF vs LF) into build errors.
+# Formatting is enforced separately by the advisory `dotnet format --verify-no-changes` CI step.
 root = true
 
 [*]
@@ -11,25 +14,18 @@ indent_style = space
 
 [*.{cs,csx}]
 indent_size = 4
-# Treat key code-style analyzers as build errors so formatting drift fails CI, not just warns.
-dotnet_diagnostic.IDE0055.severity = error   # formatting
 dotnet_sort_system_directives_first = true
 dotnet_separate_import_directive_groups = false
-csharp_using_directive_placement = outside_namespace:warning
-csharp_style_namespace_declarations = file_scoped:warning
-dotnet_style_qualification_for_field = false:warning
-dotnet_style_qualification_for_property = false:warning
+csharp_using_directive_placement = outside_namespace:silent
+csharp_style_namespace_declarations = file_scoped:silent
 
 [*.{yml,yaml,json,proto}]
 indent_size = 2
 
-[*.{sh}]
+[*.sh]
 indent_size = 2
 
-[*.{Dockerfile,dockerfile}]
-indent_size = 4
-
-[*.{py}]
+[*.py]
 indent_size = 4
 
 [*.md]

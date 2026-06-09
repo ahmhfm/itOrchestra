@@ -1,10 +1,27 @@
-* text=auto
+# itOrchestra - normalize line endings (Phase 0.11). Source/text files are stored with LF so the
+# repo is consistent across Windows authoring and Linux CI/runtime (avoids CRLF-vs-LF formatting
+# noise). Binary assets are left untouched.
+* text=auto eol=lf
 
+*.cs   text eol=lf
+*.csproj text eol=lf
+*.props text eol=lf
+*.targets text eol=lf
+*.sln  text eol=lf
+*.py   text eol=lf
 *.sh   text eol=lf
-*.yaml text eol=lf
 *.yml  text eol=lf
+*.yaml text eol=lf
+*.json text eol=lf
+*.proto text eol=lf
 *.md   text eol=lf
+*.tpl  text eol=lf
+Dockerfile text eol=lf
 
-*.cs   text eol=crlf
-*.csproj text
-*.slnx text
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.ico  binary
+*.pfx  binary
+*.snk  binary
