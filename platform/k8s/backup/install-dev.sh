@@ -93,7 +93,9 @@ fi
 echo "==> Mirroring the backup endpoint into Vault (secret/itorchestra/shared/backup)"
 ROOT_TOKEN="$(kubectl -n "${VAULT_NS}" get secret vault-unseal-keys -o jsonpath='{.data.root-token}' 2>/dev/null | base64 -d || true)"
 if [ -n "${ROOT_TOKEN}" ]; then
-  kubectl -n "${VAULT_NS}" exec -i vault-0 -- env \
+  # Non-fatal: if Vault is sealed/unavailable, warn and continue (the mirror is a convenience
+  # catalog; the backup layer itself does not depend on it). Re-run after unsealing to seed it.
+  if ! kubectl -n "${VAULT_NS}" exec -i vault-0 -- env \
     VAULT_ADDR="http://127.0.0.1:8200" VAULT_TOKEN="${ROOT_TOKEN}" \
     MINIO_USER="${MINIO_USER}" MINIO_PW="${MINIO_PW}" BUCKET="${BUCKET}" \
     sh -s <<'EOSH'
@@ -105,6 +107,9 @@ vault kv put secret/itorchestra/shared/backup \
   s3-secret-key="$MINIO_PW"
 echo "  seeded: secret/itorchestra/shared/backup"
 EOSH
+  then
+    echo "    !! Vault mirror skipped (Vault sealed/unavailable). Unseal it, then re-run this script." >&2
+  fi
 else
   echo "    !! could not read Vault root token (Phase 0.5?); skipping Vault mirror" >&2
 fi
