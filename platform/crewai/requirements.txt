@@ -10,8 +10,8 @@ grpcio-tools>=1.62,<2
 grpcio-health-checking>=1.62,<2
 grpcio-reflection>=1.62,<2
 protobuf>=4.25,<6
-requests>=2.31,<3
-pymssql>=2.3.0,<3
+requests>=2.34.2,<3
+pymssql>=2.3.13,<3
 # CrewAI multi-agent framework + LLM router (litellm extra so it can talk to Ollama via the
 # OpenAI-compatible surface). Dev defaults to USE_CREWAI=false (a single direct LLM call, which
 # is far faster on CPU); flip it to true on the prod/GPU profile to run the full crew loop.
