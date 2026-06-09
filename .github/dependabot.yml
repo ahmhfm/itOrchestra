@@ -57,4 +57,11 @@ updates:
     directory: /platform/crewai
     schedule:
       interval: weekly
+    # crewai itself caps the interpreter (every current release is Requires-Python >=3.10,<3.14), so
+    # a base-image jump to python:3.14-slim makes `pip install crewai` find no matching distribution.
+    # Pin the Python runtime line for this service and bump it by hand (within crewai's ceiling) only
+    # after validating the build; Dependabot still patches everything else in the image.
+    ignore:
+      - dependency-name: python
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
     labels: ["dependencies", "docker"]
