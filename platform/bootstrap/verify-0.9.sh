@@ -86,6 +86,13 @@ else
   bad "could not read Vault root token (sealed? Phase 0.5?)"
 fi
 
+echo "== 10) Qdrant Helm chart version pinned =="
+QCH="$(helm -n "${NS}" list -o json 2>/dev/null | grep -o '"chart":"[^"]*"' || true)"
+case "${QCH}" in
+  *'"qdrant-1.18.2"'*) ok "pinned chart deployed: qdrant-1.18.2" ;;
+  *) bad "expected pinned chart qdrant-1.18.2 not deployed (got: $(echo "${QCH}" | tr '\n' ' '))" ;;
+esac
+
 echo "========================================================"
 echo "Phase 0.9 verification: ${PASS} passed, ${FAIL} failed."
 echo "========================================================"

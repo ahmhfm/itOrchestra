@@ -18,11 +18,11 @@ export KUBECONFIG="${KUBECONFIG:-${HOME}/.kube/config}"
 NS="observability"
 VAULT_NS="vault"
 
-# Chart versions float to latest by default (override to pin in prod). The resolved
-# versions are printed after install.
-KPS_CHART_VERSION="${KPS_CHART_VERSION:-}"
-TEMPO_CHART_VERSION="${TEMPO_CHART_VERSION:-}"
-OTEL_CHART_VERSION="${OTEL_CHART_VERSION:-}"
+# Chart versions are PINNED (reproducible installs; no surprise upgrade/downgrade on re-run).
+# Frozen at the versions verified on the dev cluster; override the env var to move deliberately.
+KPS_CHART_VERSION="${KPS_CHART_VERSION:-86.2.0}"     # kube-prometheus-stack (app Prometheus v0.91.0)
+TEMPO_CHART_VERSION="${TEMPO_CHART_VERSION:-1.24.4}" # grafana/tempo (app 2.9.0)
+OTEL_CHART_VERSION="${OTEL_CHART_VERSION:-0.158.1}"  # opentelemetry-collector (app 0.153.0)
 
 ver_arg() { [ -n "$1" ] && printf -- "--version %s" "$1" || true; }
 gen_pw() { openssl rand -hex 24; }

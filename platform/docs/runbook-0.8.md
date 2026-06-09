@@ -74,8 +74,9 @@ Helm repos -> deploys OpenSearch -> Tempo -> kube-prometheus-stack -> SLO rules 
 Collector -> opens gateway egress -> **rebuilds + restarts the gateway** with the `/grafana`
 route -> mirrors creds/endpoints into Vault. It is idempotent.
 
-> Override floating chart versions to pin (prod): `KPS_CHART_VERSION=… TEMPO_CHART_VERSION=…
-> OTEL_CHART_VERSION=… bash bootstrap/07-observability-dev.sh`.
+> Chart versions are **pinned** in the installer (`kube-prometheus-stack 86.2.0`, `tempo 1.24.4`,
+> `opentelemetry-collector 0.158.1`) for reproducible installs. To move deliberately, override the
+> env var: `KPS_CHART_VERSION=… TEMPO_CHART_VERSION=… OTEL_CHART_VERSION=… bash bootstrap/07-observability-dev.sh`.
 
 ## Verify
 

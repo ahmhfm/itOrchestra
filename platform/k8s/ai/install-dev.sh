@@ -18,7 +18,9 @@ ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"          # .../platform/k8s
 export KUBECONFIG="${KUBECONFIG:-${HOME}/.kube/config}"
 NS="ai"
 VAULT_NS="vault"
-QDRANT_CHART_VERSION="${QDRANT_CHART_VERSION:-}"
+# Pinned for reproducible installs (frozen at the version verified on the dev cluster); override
+# the env var to move deliberately.
+QDRANT_CHART_VERSION="${QDRANT_CHART_VERSION:-1.18.2}"   # qdrant/qdrant (app v1.18.2)
 CHAT_MODEL="${CHAT_MODEL:-qwen2.5:1.5b}"
 EMBED_MODEL="${EMBED_MODEL:-bge-m3}"
 

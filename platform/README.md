@@ -372,6 +372,11 @@ Layout: `k8s/backup/` (`namespace.yaml`, `minio/{pv-pvc,deployment,service}.yaml
 - NetworkPolicies are **default-deny** (ingress + egress); only DNS is allowed by default,
   everything else must be explicitly opened per service.
 - No secrets in Git - secrets come from Vault (step 0.5). The `.gitignore` blocks kubeconfig.
+- All third-party **Helm charts are version-pinned** in their installers (reproducible installs;
+  no surprise upgrade/downgrade on re-run): vault `0.32.0`, velero `12.0.2`, longhorn `1.7.2`,
+  cilium/ingress-nginx/metallb, kube-prometheus-stack `86.2.0`, tempo `1.24.4`,
+  opentelemetry-collector `0.158.1`, qdrant `1.18.2`. Each is overridable via an env var to move
+  deliberately; `verify-0.8`/`verify-0.9` assert the deployed chart matches the pin.
 - Each workload runs under its **own dedicated ServiceAccount** (e.g. `gateway`, `crewai`), never
   the namespace `default` SA. The SAs carry **no** Role/RoleBinding (the services do not call the
   Kubernetes API, so they hold zero cluster RBAC = least privilege); they exist to give each
