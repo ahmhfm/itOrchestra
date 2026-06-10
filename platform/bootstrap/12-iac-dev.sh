@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # itOrchestra - Phase 0.13 one-shot (dev): bootstrap the IaC / GitOps control plane.
-#   1. Seed the External Secrets Vault role + reapply the Vault ingress fence (re-run vault installer;
-#      idempotent). This is the only piece ESO needs in Vault to authenticate.
+#   1. Seed the External Secrets Vault role + reapply the Vault ingress fence (lightweight, idempotent;
+#      unseals Vault if needed). This is the only piece ESO needs in Vault to authenticate. It does
+#      NOT re-run the heavy Vault installer (no helm upgrade / pod roll).
 #   2. Terraform: install ArgoCD + External Secrets Operator + register the App-of-Apps root.
 #   3. Verify.
 #
@@ -21,7 +22,7 @@ TF_DIR="${ROOT}/infra/terraform/envs/dev"
 command -v terraform >/dev/null 2>&1 || { echo "!! terraform not found on PATH" >&2; exit 1; }
 
 echo "==> [0.13] Seeding the External Secrets Vault role + reapplying the Vault fence"
-bash "${ROOT}/k8s/vault/install-dev.sh"
+bash "${ROOT}/k8s/external-secrets/seed-vault-role.sh"
 
 echo "==> [0.13] Terraform init + apply (ArgoCD + ESO + GitOps root)"
 terraform -chdir="${TF_DIR}" init -input=false
