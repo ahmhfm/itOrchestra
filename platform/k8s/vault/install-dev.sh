@@ -130,6 +130,25 @@ vault write auth/kubernetes/role/crewai \
   policies=itorchestra-crewai \
   ttl=1h
 
+# Least-privilege policy for the External Secrets Operator (Phase 0.13 GitOps): read-only across the
+# whole itOrchestra KV subtree so ESO can materialize ANY service's secrets into k8s Secrets from a
+# single ClusterSecretStore. Bound to ESO's 'external-secrets' SA in the external-secrets namespace
+# (the operator is installed by Terraform - infra/terraform/envs/dev).
+vault policy write itorchestra-external-secrets - <<'EOP'
+path "secret/data/itorchestra/*" {
+  capabilities = ["read"]
+}
+path "secret/metadata/itorchestra/*" {
+  capabilities = ["read", "list"]
+}
+EOP
+
+vault write auth/kubernetes/role/external-secrets \
+  bound_service_account_names=external-secrets \
+  bound_service_account_namespaces=external-secrets \
+  policies=itorchestra-external-secrets \
+  ttl=1h
+
 # Seed the Phase 0.4 secrets (KV v2).
 vault kv put secret/itorchestra/keycloak/admin   username="$KC_ADMIN_USER" password="$KC_ADMIN_PW"
 vault kv put secret/itorchestra/keycloak/db       sa-password="$KC_SA_PW"  kc-password="$KC_DB_PW"

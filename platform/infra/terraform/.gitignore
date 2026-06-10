@@ -1,0 +1,15 @@
+# Terraform local state, plans, provider plugins, and machine-specific var files.
+.terraform/
+# NOTE: .terraform.lock.hcl is intentionally NOT ignored - commit it for reproducible provider pins.
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+*.tfvars
+!*.tfvars.example
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraformrc
+terraform.rc

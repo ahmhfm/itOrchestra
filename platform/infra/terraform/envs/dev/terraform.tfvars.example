@@ -1,0 +1,9 @@
+# Copy to terraform.tfvars and adjust if needed. Every value has a sensible default, so an empty
+# terraform.tfvars (or none at all) works for the standard dev VM.
+
+# kubeconfig_path        = "~/.kube/config"
+# kube_context           = ""                      # empty = current-context
+# gitops_repo_url        = "https://github.com/ahmhfm/itOrchestra.git"
+# gitops_target_revision = "main"
+# argocd_chart_version   = "9.5.20"
+# eso_chart_version      = "2.6.0"
