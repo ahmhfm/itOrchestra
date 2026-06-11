@@ -1,0 +1,31 @@
+# App-of-Apps child (Phase 0.12.2 - wave 7, meshed service). Adopts the CrewAI service manifests
+# (ServiceAccount, Deployment, Service, NetworkPolicy) into GitOps.
+#
+# NOT GitOps-managed (imperative): the CrewAI container image build/import, and its Vault-Agent
+# secret injection (the agent logs in with the 'crewai' SA and fetches secrets at runtime). The
+# Linkerd sidecar is injected by the mesh webhook at pod creation, not part of the Deployment spec,
+# so it does not appear as a diff.
+#
+# MANUAL SYNC (no automated block): adopt after reviewing the diff.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: crewai
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "7"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: itorchestra
+  source:
+    repoURL: https://github.com/ahmhfm/itOrchestra.git
+    targetRevision: main
+    path: platform/k8s/crewai
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: ns-crewai
+  syncPolicy:
+    syncOptions:
+      - ServerSideApply=true
+      - ApplyOutOfSyncOnly=true

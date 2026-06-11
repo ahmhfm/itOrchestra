@@ -1,0 +1,31 @@
+# App-of-Apps child (Phase 0.12.2 - wave 5, data store). Adopts the Redis manifests
+# (ConfigMap, Service, NetworkPolicy ingress-fence, StatefulSet) into GitOps.
+#
+# NOT GitOps-managed (imperative, owned by k8s/redis/install-dev.sh): the generated 'redis-auth'
+# Secret and its Vault mirror (secret/itorchestra/shared/redis). ArgoCD manages only the declarative
+# manifests; the live Secret stays untouched, so the StatefulSet keeps its AUTH.
+#
+# MANUAL SYNC (no automated block): stateful component - adopt only after reviewing the diff. The
+# .sh installer in this folder is ignored by ArgoCD's directory reconciler (it reads YAML/JSON only).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: redis
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: itorchestra
+  source:
+    repoURL: https://github.com/ahmhfm/itOrchestra.git
+    targetRevision: main
+    path: platform/k8s/redis
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: redis
+  syncPolicy:
+    syncOptions:
+      - ServerSideApply=true
+      - ApplyOutOfSyncOnly=true

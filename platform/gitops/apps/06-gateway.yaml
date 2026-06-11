@@ -1,0 +1,31 @@
+# App-of-Apps child (Phase 0.12.2 - wave 6, edge service). Adopts the YARP API Gateway manifests
+# (ServiceAccount, dev Deployment, Service, NetworkPolicy) into GitOps.
+#
+# NOT GitOps-managed (imperative): the gateway container image is built+imported locally by
+# gateway/build-and-import-dev.sh (and rebuilt by the observability step to add the /grafana route).
+# ArgoCD manages the Deployment manifest (image ref/spec); it does not build images.
+#
+# MANUAL SYNC (no automated block): adopt after reviewing the diff (the gateway is the single public
+# entry point - avoid surprise restarts).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: gateway
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "6"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: itorchestra
+  source:
+    repoURL: https://github.com/ahmhfm/itOrchestra.git
+    targetRevision: main
+    path: platform/k8s/gateway
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: ns-gateway
+  syncPolicy:
+    syncOptions:
+      - ServerSideApply=true
+      - ApplyOutOfSyncOnly=true
