@@ -1,0 +1,53 @@
+# App-of-Apps child (Phase 0.13.2 - wave 4). Models the existing ingress-nginx Helm release as a
+# multi-source ArgoCD Application: the upstream chart (PINNED 4.11.3 - same as the installer) plus
+# the repo's values.yaml referenced via the $values source. This makes the edge LB controller
+# fully declarative.
+#
+# MANUAL SYNC ON PURPOSE (no automated block): ingress-nginx is on the external traffic path and
+# was Helm-installed; we adopt it only after reviewing the diff. Enable auto-sync in a later step
+# once it diffs cleanly.
+#
+# ignoreDifferences:
+#   - the admission webhook caBundle is injected at runtime by the chart's patch Job (not in Git),
+#     so it would otherwise show a permanent OutOfSync.
+#   - the LoadBalancer Service's healthCheckNodePort / nodePorts are allocated by the API server.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: ingress-nginx
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-7"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: itorchestra
+  sources:
+    - repoURL: https://kubernetes.github.io/ingress-nginx
+      chart: ingress-nginx
+      targetRevision: 4.11.3
+      helm:
+        valueFiles:
+          - $values/platform/k8s/cluster/ingress-nginx/values.yaml
+    - repoURL: https://github.com/ahmhfm/itOrchestra.git
+      targetRevision: main
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: ingress-nginx
+  ignoreDifferences:
+    - group: admissionregistration.k8s.io
+      kind: ValidatingWebhookConfiguration
+      name: ingress-nginx-admission
+      jsonPointers:
+        - /webhooks/0/clientConfig/caBundle
+    - group: ""
+      kind: Service
+      name: ingress-nginx-controller
+      namespace: ingress-nginx
+      jsonPointers:
+        - /spec/healthCheckNodePort
+  syncPolicy:
+    syncOptions:
+      - ServerSideApply=true
+      - CreateNamespace=false

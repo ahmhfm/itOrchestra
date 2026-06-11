@@ -1,0 +1,35 @@
+# App-of-Apps child (Phase 0.13.2 - wave 3). Adopts the default StorageClass
+# 'itorchestra-longhorn' into GitOps. This is ONLY the StorageClass object - NOT the Longhorn
+# Helm release (the live storage backbone + volumes stay owned by their Helm install; adopting
+# the whole chart is a deliberate, higher-risk later step).
+#
+# The repo manifest matches the live class exactly (dev = 1 replica), so adoption is a no-op.
+# StorageClass parameters/provisioner are immutable: because Git == live there is nothing to
+# update, so the sync only attaches ArgoCD tracking.
+#
+# SAFE ADOPTION: manual sync first (verify `kubectl diff` is empty), then auto-sync selfHeal.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: platform-storage-class
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-8"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: itorchestra
+  source:
+    repoURL: https://github.com/ahmhfm/itOrchestra.git
+    targetRevision: main
+    path: platform/k8s/cluster/longhorn
+    directory:
+      # The folder also holds install.sh/prereqs.sh; only sync the StorageClass manifest.
+      include: 'storageclass.yaml'
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: default
+  syncPolicy:
+    syncOptions:
+      - ServerSideApply=true
+      - ApplyOutOfSyncOnly=true

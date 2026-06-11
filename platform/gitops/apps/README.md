@@ -27,8 +27,9 @@ does not own (secret generation, Vault seeding, model pulls, collection init, im
 |------|------------------------------|-------------------------------------|--------|
 | -10  | `platform-namespaces`        | `k8s/namespaces` (manifests)        | done (auto-sync: selfHeal, no prune) |
 |  -9  | `platform-network-policies`  | `k8s/network-policies` (manifests)  | done (auto-sync: selfHeal + prune)   |
-|  -8  | `platform-storage` (longhorn SC) | helm + `k8s/cluster/longhorn`   | todo   |
-|  -7  | `platform-metallb` / `platform-ingress` | helm multi-source       | todo   |
+|  -8  | `platform-storage-class`     | `k8s/cluster/longhorn` (SC only)    | done (StorageClass only; Longhorn chart adopted later) |
+|  -7  | `ingress-nginx`              | helm 4.11.3 + repo values (multi-src) | adopting (manual; webhook caBundle ignored) |
+|  -7  | MetalLB pool                 | n/a                                 | **deferred in dev** - the pool is auto-detected from the VM NIC at runtime (`metallb/install.sh`); the repo `ippool.dev.yaml` is only an example and does NOT match the live `10.178.95.240-250` pool. GitOps-ifying it would break the LB IP. Revisit with a static per-env pool in 0.13.5. |
 |  -5  | `platform-secrets`           | `gitops/components/secrets` (ESO)   | done   |
 |   0  | data stores (vault/redis/mssql/opensearch/qdrant) | helm + manifests | todo (manual) |
 |   5  | `keycloak`                   | `k8s/keycloak` (manifests)          | todo (manual) |
