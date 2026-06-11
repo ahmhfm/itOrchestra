@@ -6,7 +6,7 @@
 # Linkerd sidecar is injected by the mesh webhook at pod creation, not part of the Deployment spec,
 # so it does not appear as a diff.
 #
-# MANUAL SYNC (no automated block): adopt after reviewing the diff.
+# Auto-sync enabled after a clean adoption diff review (0.12.2).
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:

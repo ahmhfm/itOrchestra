@@ -5,8 +5,8 @@
 # gateway/build-and-import-dev.sh (and rebuilt by the observability step to add the /grafana route).
 # ArgoCD manages the Deployment manifest (image ref/spec); it does not build images.
 #
-# MANUAL SYNC (no automated block): adopt after reviewing the diff (the gateway is the single public
-# entry point - avoid surprise restarts).
+# Auto-sync enabled after a clean adoption diff review (0.12.2). selfHeal+prune; the image is still
+# built/imported out-of-band (imagePullPolicy:Never), so ArgoCD only manages the declarative spec.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:

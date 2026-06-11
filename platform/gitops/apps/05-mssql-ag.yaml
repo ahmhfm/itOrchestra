@@ -5,8 +5,8 @@
 # Secret(s), the Always On AG bootstrap (endpoints/certs/seeding), and per-DB creation. ArgoCD
 # manages only the declarative manifests; the live data + AG topology stay untouched.
 #
-# MANUAL SYNC (no automated block): stateful database - adopt only after reviewing the diff, and
-# never let prune touch the StatefulSet/PVCs.
+# Auto-sync enabled after a clean adoption diff review (0.12.2). prune is kept FALSE so it never
+# touches the StatefulSet/PVCs; /spec/volumeClaimTemplates is ignored to avoid phantom diffs.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:

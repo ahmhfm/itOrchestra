@@ -3,9 +3,7 @@
 # the repo's values.yaml referenced via the $values source. This makes the edge LB controller
 # fully declarative.
 #
-# MANUAL SYNC ON PURPOSE (no automated block): ingress-nginx is on the external traffic path and
-# was Helm-installed; we adopt it only after reviewing the diff. Enable auto-sync in a later step
-# once it diffs cleanly.
+# Auto-sync enabled after a clean adoption diff review (0.12.2); see syncPolicy note below.
 #
 # ignoreDifferences:
 #   - the admission webhook caBundle is injected at runtime by the chart's patch Job (not in Git),

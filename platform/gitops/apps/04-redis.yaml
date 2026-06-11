@@ -5,8 +5,9 @@
 # Secret and its Vault mirror (secret/itorchestra/shared/redis). ArgoCD manages only the declarative
 # manifests; the live Secret stays untouched, so the StatefulSet keeps its AUTH.
 #
-# MANUAL SYNC (no automated block): stateful component - adopt only after reviewing the diff. The
-# .sh installer in this folder is ignored by ArgoCD's directory reconciler (it reads YAML/JSON only).
+# Auto-sync enabled after a clean adoption diff review (0.12.2). prune is kept FALSE (protect the
+# StatefulSet/PVC); /spec/volumeClaimTemplates is ignored to avoid phantom diffs. The .sh installer
+# in this folder is ignored by ArgoCD's directory reconciler (it reads YAML/JSON only).
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
