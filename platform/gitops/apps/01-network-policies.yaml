@@ -1,0 +1,31 @@
+# App-of-Apps child (Phase 0.13.2 - wave 2). Adopts the baseline NetworkPolicies into GitOps:
+# default-deny (ingress+egress) + allow-dns + allow-linkerd for the application namespaces.
+# Every policy declares its own metadata.namespace, so this single Application fans out across
+# ns-gateway / ns-identity / ns-assets / ns-discovery without relying on destination.namespace.
+#
+# Runs after namespaces (wave -10 -> -9): the target namespaces must exist first.
+#
+# SAFE ADOPTION: manual sync only (no automated/prune/selfHeal). These policies already match
+# the live cluster; ArgoCD adopts them on the first manual sync via ServerSideApply.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: platform-network-policies
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-9"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: itorchestra
+  source:
+    repoURL: https://github.com/ahmhfm/itOrchestra.git
+    targetRevision: main
+    path: platform/k8s/network-policies
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: default
+  syncPolicy:
+    syncOptions:
+      - ServerSideApply=true
+      - ApplyOutOfSyncOnly=true

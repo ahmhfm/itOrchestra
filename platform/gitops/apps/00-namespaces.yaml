@@ -1,0 +1,31 @@
+# App-of-Apps child (Phase 0.13.2 - wave 1). Adopts the platform + per-service namespaces
+# (k8s/namespaces/namespaces.yaml) into GitOps. Each Namespace declares its own name, PSA
+# enforce level, and linkerd.io/inject annotation, so this is a pure declarative slice that
+# already matches the live cluster - zero data risk.
+#
+# SAFE ADOPTION: no automated/prune/selfHeal yet. ArgoCD will compute the diff and show
+# Synced/OutOfSync but never act until a human syncs (or until wave-by-wave auto-sync is
+# enabled in a later step). ServerSideApply makes adoption of the live, kubectl-applied
+# namespaces clean (no last-applied-configuration conflict).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: platform-namespaces
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-10"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: itorchestra
+  source:
+    repoURL: https://github.com/ahmhfm/itOrchestra.git
+    targetRevision: main
+    path: platform/k8s/namespaces
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: default
+  syncPolicy:
+    syncOptions:
+      - ServerSideApply=true
+      - ApplyOutOfSyncOnly=true
