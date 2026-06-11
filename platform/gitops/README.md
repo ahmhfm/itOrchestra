@@ -1,4 +1,4 @@
-# itOrchestra GitOps (ArgoCD) - Phase 0.13
+# itOrchestra GitOps (ArgoCD) - Phase 0.12
 
 ArgoCD is the single source of truth for everything **inside** the cluster. Terraform installs
 ArgoCD + ESO and registers one root Application; from there this directory drives the platform.

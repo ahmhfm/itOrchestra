@@ -22,7 +22,7 @@ resource "kubectl_manifest" "app_project" {
       namespace = var.argocd_namespace
     }
     spec = {
-      description  = "itOrchestra platform delivered via GitOps (Phase 0.13)."
+      description  = "itOrchestra platform delivered via GitOps (Phase 0.12)."
       sourceRepos  = [var.repo_url]
       destinations = [{
         server    = "https://kubernetes.default.svc"

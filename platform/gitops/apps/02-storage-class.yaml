@@ -1,4 +1,4 @@
-# App-of-Apps child (Phase 0.13.2 - wave 3). Adopts the default StorageClass
+# App-of-Apps child (Phase 0.12.2 - wave 3). Adopts the default StorageClass
 # 'itorchestra-longhorn' into GitOps. This is ONLY the StorageClass object - NOT the Longhorn
 # Helm release (the live storage backbone + volumes stay owned by their Helm install; adopting
 # the whole chart is a deliberate, higher-risk later step).

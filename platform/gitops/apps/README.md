@@ -1,4 +1,4 @@
-# App-of-Apps children (Phase 0.13.2)
+# App-of-Apps children (Phase 0.12.2)
 
 `itorchestra-root` (registered by Terraform in 0.13.1) recurses this directory. Every
 `Application` here is a child the root reconciles from Git. Ordering between children is driven

@@ -1,4 +1,4 @@
-# App-of-Apps child (Phase 0.13.2 - wave 4). Models the existing ingress-nginx Helm release as a
+# App-of-Apps child (Phase 0.12.2 - wave 4). Models the existing ingress-nginx Helm release as a
 # multi-source ArgoCD Application: the upstream chart (PINNED 4.11.3 - same as the installer) plus
 # the repo's values.yaml referenced via the $values source. This makes the edge LB controller
 # fully declarative.

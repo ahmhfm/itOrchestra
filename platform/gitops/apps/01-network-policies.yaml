@@ -1,4 +1,4 @@
-# App-of-Apps child (Phase 0.13.2 - wave 2). Adopts the baseline NetworkPolicies into GitOps:
+# App-of-Apps child (Phase 0.12.2 - wave 2). Adopts the baseline NetworkPolicies into GitOps:
 # default-deny (ingress+egress) + allow-dns + allow-linkerd for the application namespaces.
 # Every policy declares its own metadata.namespace, so this single Application fans out across
 # ns-gateway / ns-identity / ns-assets / ns-discovery without relying on destination.namespace.

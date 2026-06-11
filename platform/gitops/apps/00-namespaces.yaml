@@ -1,4 +1,4 @@
-# App-of-Apps child (Phase 0.13.2 - wave 1). Adopts the platform + per-service namespaces
+# App-of-Apps child (Phase 0.12.2 - wave 1). Adopts the platform + per-service namespaces
 # (k8s/namespaces/namespaces.yaml) into GitOps. Each Namespace declares its own name, PSA
 # enforce level, and linkerd.io/inject annotation, so this is a pure declarative slice that
 # already matches the live cluster - zero data risk.

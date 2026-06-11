@@ -1,4 +1,4 @@
-# itOrchestra IaC (Terraform) - Phase 0.13
+# itOrchestra IaC (Terraform) - Phase 0.12
 
 Terraform's role in itOrchestra is **bootstrap only**. It does not manage application/component state
 in-cluster; it stands up the GitOps control plane and then hands off to ArgoCD, which reconciles

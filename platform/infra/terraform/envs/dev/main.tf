@@ -1,4 +1,4 @@
-# Phase 0.13.1 - dev IaC control plane. Terraform's scope is bootstrap ONLY:
+# Phase 0.12.1 - dev IaC control plane. Terraform's scope is bootstrap ONLY:
 #   1. ArgoCD  (GitOps engine)
 #   2. External Secrets Operator (Vault-backed secrets for GitOps)
 #   3. The App-of-Apps root + AppProject (handoff to GitOps for everything else)

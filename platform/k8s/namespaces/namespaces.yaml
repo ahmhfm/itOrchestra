@@ -98,7 +98,7 @@ metadata:
   annotations:
     # Redis is shared infra and is NOT meshed in dev (AUTH now, TLS in prod), consistent with the
     # other data stores (vault/mssql/ai/observability). Set by k8s/redis/install-dev.sh; recorded
-    # here so the GitOps source of truth matches the live namespace (Phase 0.13.2 adoption).
+    # here so the GitOps source of truth matches the live namespace (Phase 0.12.2 adoption).
     linkerd.io/inject: disabled
 ---
 # Reference MSSQL Always On AG (Phase 0.7). Out of the mesh, like other data stores
