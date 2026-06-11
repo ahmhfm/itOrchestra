@@ -26,6 +26,11 @@ spec:
     server: https://kubernetes.default.svc
     namespace: ns-crewai
   syncPolicy:
+    # Adopted cleanly in 0.12.2. Auto-sync ON: selfHeal reverts drift; prune=true (all manifests are
+    # in the crewai dir). NOTE: the image is built/imported out-of-band.
+    automated:
+      selfHeal: true
+      prune: true
     syncOptions:
       - ServerSideApply=true
       - ApplyOutOfSyncOnly=true

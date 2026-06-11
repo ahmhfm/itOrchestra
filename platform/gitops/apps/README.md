@@ -31,12 +31,12 @@ does not own (secret generation, Vault seeding, model pulls, collection init, im
 |  -7  | `ingress-nginx`              | helm 4.11.3 + repo values (multi-src) | done (adopted clean; auto-sync selfHeal+prune; webhook caBundle ignored) |
 |  -7  | MetalLB pool                 | n/a                                 | **deferred in dev** - the pool is auto-detected from the VM NIC at runtime (`metallb/install.sh`); the repo `ippool.dev.yaml` is only an example and does NOT match the live `10.178.95.240-250` pool. GitOps-ifying it would break the LB IP. Revisit with a static per-env pool in 0.13.5. |
 |  -5  | `platform-secrets`           | `gitops/components/secrets` (ESO)   | done   |
-|   0  | `redis`                      | `k8s/redis` (manifests)             | created (manual; diff review pending) |
-|   0  | `mssql-ag`                   | `k8s/mssql-ag` (manifests)          | created (manual; diff review pending) |
+|   0  | `redis`                      | `k8s/redis` (manifests)             | done (adopted; auto-sync selfHeal, no prune; STS VCT ignored) |
+|   0  | `mssql-ag`                   | `k8s/mssql-ag` (manifests)          | done (adopted; auto-sync selfHeal, no prune; STS VCT ignored) |
 |   0  | vault / opensearch / qdrant  | helm + manifests                    | todo (manual) |
 |   5  | `keycloak`                   | `k8s/keycloak` (manifests + Jobs)   | todo (manual; db-init Job needs hook) |
-|   6  | `gateway`                    | `k8s/gateway` (manifests)           | created (manual; diff review pending) |
-|   7  | `crewai`                     | `k8s/crewai` (manifests)            | created (manual; diff review pending) |
+|   6  | `gateway`                    | `k8s/gateway` (manifests)           | done (adopted; auto-sync selfHeal+prune; image built out-of-band) |
+|   7  | `crewai`                     | `k8s/crewai` (manifests)            | done (adopted; auto-sync selfHeal+prune; image built out-of-band) |
 |  10  | `observability`              | helm multi-source + manifests       | todo (manual) |
 |  15  | `ai` (ollama)                | `k8s/ai` (manifests + Job)          | todo (manual; collections-init Job) |
 

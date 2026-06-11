@@ -35,6 +35,11 @@ spec:
       jsonPointers:
         - /spec/volumeClaimTemplates
   syncPolicy:
+    # Adopted cleanly in 0.12.2. Auto-sync ON: selfHeal reverts drift; prune=FALSE so the StatefulSet
+    # and its Longhorn PVC are never auto-deleted (data-store safety).
+    automated:
+      selfHeal: true
+      prune: false
     syncOptions:
       - ServerSideApply=true
       - ApplyOutOfSyncOnly=true
