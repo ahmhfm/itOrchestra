@@ -30,6 +30,11 @@ spec:
     server: https://kubernetes.default.svc
     namespace: default
   syncPolicy:
+    # Adopted cleanly in 0.12.2. Auto-sync ON: selfHeal reverts drift; prune=FALSE so removing the
+    # manifest never auto-deletes the cluster's default StorageClass (deliberate manual op only).
+    automated:
+      selfHeal: true
+      prune: false
     syncOptions:
       - ServerSideApply=true
       - ApplyOutOfSyncOnly=true

@@ -48,6 +48,12 @@ spec:
       jsonPointers:
         - /spec/healthCheckNodePort
   syncPolicy:
+    # Adopted cleanly in 0.12.2 (diff was only the ArgoCD tracking-id annotation; no spec change,
+    # no controller restart, LB IP preserved). Auto-sync now ON: selfHeal reverts manual drift,
+    # prune removes resources the pinned chart no longer renders (all resources are chart-owned).
+    automated:
+      selfHeal: true
+      prune: true
     syncOptions:
       - ServerSideApply=true
       - CreateNamespace=false
