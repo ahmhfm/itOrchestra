@@ -26,6 +26,13 @@ spec:
     server: https://kubernetes.default.svc
     namespace: default
   syncPolicy:
+    # Adopted cleanly in 0.13.2 (kubectl diff was empty). Auto-sync now ON:
+    #  - selfHeal: revert manual edits to the baseline deny/allow policies.
+    #  - prune:   TRUE - a NetworkPolicy removed from Git should be removed from the cluster
+    #             (low blast radius; the default-deny posture stays intact).
+    automated:
+      selfHeal: true
+      prune: true
     syncOptions:
       - ServerSideApply=true
       - ApplyOutOfSyncOnly=true

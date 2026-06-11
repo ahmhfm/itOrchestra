@@ -26,6 +26,13 @@ spec:
     server: https://kubernetes.default.svc
     namespace: default
   syncPolicy:
+    # Adopted cleanly in 0.13.2 (kubectl diff was empty). Auto-sync now ON:
+    #  - selfHeal: revert manual drift (e.g. someone flipping redis back to inject=enabled).
+    #  - prune:   FALSE on purpose - deleting a Namespace from Git must never cascade-delete a live
+    #             namespace (and everything in it). Namespace removal stays a deliberate manual op.
+    automated:
+      selfHeal: true
+      prune: false
     syncOptions:
       - ServerSideApply=true
       - ApplyOutOfSyncOnly=true

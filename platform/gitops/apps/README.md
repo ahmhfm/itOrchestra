@@ -25,8 +25,8 @@ does not own (secret generation, Vault seeding, model pulls, collection init, im
 
 | Wave | Child Application            | Source                              | Status |
 |------|------------------------------|-------------------------------------|--------|
-| -10  | `platform-namespaces`        | `k8s/namespaces` (manifests)        | done   |
-|  -9  | `platform-network-policies`  | `k8s/network-policies` (manifests)  | done   |
+| -10  | `platform-namespaces`        | `k8s/namespaces` (manifests)        | done (auto-sync: selfHeal, no prune) |
+|  -9  | `platform-network-policies`  | `k8s/network-policies` (manifests)  | done (auto-sync: selfHeal + prune)   |
 |  -8  | `platform-storage` (longhorn SC) | helm + `k8s/cluster/longhorn`   | todo   |
 |  -7  | `platform-metallb` / `platform-ingress` | helm multi-source       | todo   |
 |  -5  | `platform-secrets`           | `gitops/components/secrets` (ESO)   | done   |
