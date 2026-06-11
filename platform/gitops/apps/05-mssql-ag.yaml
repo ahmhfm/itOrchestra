@@ -25,6 +25,13 @@ spec:
   destination:
     server: https://kubernetes.default.svc
     namespace: mssql
+  ignoreDifferences:
+    # See redis app: StatefulSet volumeClaimTemplates PVC defaulting causes a phantom OutOfSync under
+    # ServerSideApply. volumeClaimTemplates are immutable on a live StatefulSet, so this is safe.
+    - group: apps
+      kind: StatefulSet
+      jsonPointers:
+        - /spec/volumeClaimTemplates
   syncPolicy:
     syncOptions:
       - ServerSideApply=true

@@ -25,6 +25,15 @@ spec:
   destination:
     server: https://kubernetes.default.svc
     namespace: redis
+  ignoreDifferences:
+    # StatefulSet volumeClaimTemplates get PVC fields defaulted by the API server (volumeMode, etc.)
+    # which the ServerSideApply diff flags as a permanent phantom OutOfSync (client-side `app diff`
+    # shows none). volumeClaimTemplates are immutable on a live StatefulSet, so ignoring them for
+    # drift never masks an actionable change.
+    - group: apps
+      kind: StatefulSet
+      jsonPointers:
+        - /spec/volumeClaimTemplates
   syncPolicy:
     syncOptions:
       - ServerSideApply=true
