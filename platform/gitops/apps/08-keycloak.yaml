@@ -1,0 +1,58 @@
+# App-of-Apps child (Phase 0.12.2 - wave 5, identity provider). Adopts the Keycloak stack
+# (private MSSQL StatefulSet+Service, realm ConfigMap, Keycloak Deployment+Service, NetworkPolicies)
+# and the db-init bootstrap Job (modeled as a Sync hook - see k8s/keycloak/db-init-job.yaml).
+#
+# NOT GitOps-managed (imperative, owned by k8s/keycloak/install-dev.sh):
+#   - the generated Secrets 'keycloak-db' and 'keycloak-admin' (will move to ExternalSecrets/Vault
+#     in a later step; for now they stay live and untouched).
+#   - KC_HOSTNAME on the Keycloak Deployment: install-dev.sh sed-injects the gateway's runtime
+#     LoadBalancer URL (MetalLB-assigned, env-specific). We ignore that single env value (jq-selected)
+#     and set RespectIgnoreDifferences so ArgoCD never reverts it to the in-repo placeholder. This
+#     becomes a real per-env overlay value in 0.12.5.
+#
+# MANUAL SYNC (no automated block): identity provider - adopt only after reviewing the diff
+# (`argocd app diff keycloak`). The expected diff is just the ArgoCD tracking-id annotation; the
+# KC_HOSTNAME value must NOT appear (proving RespectIgnoreDifferences works) before we enable auto-sync.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: keycloak
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "5"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: itorchestra
+  source:
+    repoURL: https://github.com/ahmhfm/itOrchestra.git
+    targetRevision: main
+    path: platform/k8s/keycloak
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: keycloak
+  ignoreDifferences:
+    # KC_HOSTNAME is injected at deploy time (gateway LoadBalancer URL); never revert it. jq selects
+    # the single env value by name so the path is stable regardless of env ordering.
+    - group: apps
+      kind: Deployment
+      name: keycloak
+      namespace: keycloak
+      jqPathExpressions:
+        - '.spec.template.spec.containers[] | select(.name=="keycloak").env[] | select(.name=="KC_HOSTNAME").value'
+    # StatefulSet volumeClaimTemplates get PVC fields defaulted by the API server (volumeMode, etc.)
+    # which ServerSideApply flags as a permanent phantom OutOfSync. VCTs are immutable on a live
+    # StatefulSet, so ignoring them never masks an actionable change.
+    - group: apps
+      kind: StatefulSet
+      name: keycloak-mssql
+      namespace: keycloak
+      jsonPointers:
+        - /spec/volumeClaimTemplates
+  syncPolicy:
+    syncOptions:
+      - ServerSideApply=true
+      - ApplyOutOfSyncOnly=true
+      # Make SYNC (not just diff) honor ignoreDifferences, so the KC_HOSTNAME placeholder is never
+      # pushed over the live gateway URL.
+      - RespectIgnoreDifferences=true

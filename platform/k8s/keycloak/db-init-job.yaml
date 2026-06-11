@@ -4,6 +4,12 @@
 #
 # Not meshed (linkerd.io/inject=disabled): it's a short-lived Job that only opens a TCP
 # connection to MSSQL in the same namespace, so we avoid any Job-completion edge cases.
+#
+# GitOps (Phase 0.12.2): this is an ArgoCD Sync hook, NOT a tracked resource. A Job's spec is
+# immutable, so managing it as a normal resource would error on every re-sync. As a hook it runs
+# during sync (after the namespace/Secret/MSSQL exist) and is recreated cleanly each time
+# (hook-delete-policy=BeforeHookCreation). The SQL is idempotent (IF NOT EXISTS guards), so
+# re-running is safe. Plain `kubectl apply` (install-dev.sh) ignores these annotations.
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -11,6 +17,9 @@ metadata:
   namespace: keycloak
   labels:
     app: keycloak-db-init
+  annotations:
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
 spec:
   backoffLimit: 6
   ttlSecondsAfterFinished: 600
