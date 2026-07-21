@@ -64,7 +64,7 @@ jobs:
     runs-on: ${{ inputs.runner }}               # ubuntu-latest (scaffold) or a self-hosted label (real)
     environment: ${{ inputs.environment }}      # <- approval gate (reviewers configured per env)
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - uses: azure/setup-helm@v5
 
